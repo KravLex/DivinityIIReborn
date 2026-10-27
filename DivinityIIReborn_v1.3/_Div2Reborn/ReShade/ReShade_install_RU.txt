@@ -1,0 +1,7 @@
+﻿ReShade с DXVK работает только через свой установщик:
+1. Скачайте ReShade с https://reshade.me и запустите установщик.
+2. Выберите bin\Divinity2.exe, API: Vulkan.
+3. Эффекты: SMAA, CAS, Curves, Vibrance, Deband (набор "Standard effects").
+4. Скопируйте файлы Div2Reborn_*.ini из этой папки в bin игры.
+5. В игре: Home - меню ReShade, выберите пресет Div2Reborn_1_Recommended.ini.
+   Пресеты: 0 Off, 1 Recommended, 2 Clean, 3 Vivid.
