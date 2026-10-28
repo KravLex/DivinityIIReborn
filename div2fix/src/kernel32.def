@@ -30,3 +30,17 @@ CreateThread@24
 MultiByteToWideChar@24
 WideCharToMultiByte@32
 GetCurrentProcessId@0
+TlsAlloc@0
+TlsGetValue@4
+TlsSetValue@8
+OpenThread@12
+SuspendThread@4
+ResumeThread@4
+GetThreadContext@8
+SetThreadPriority@8
+GetCurrentThread@0
+K32EnumProcessModules@16
+K32GetModuleInformation@16
+CreateWaitableTimerExW@16
+SetWaitableTimer@24
+WaitForSingleObject@8

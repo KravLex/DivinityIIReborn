@@ -18,6 +18,7 @@
 
 static float  g_invLod = 1.0f;
 static float  g_fRange = 200.0f, g_fSplit = 0.75f;
+static float  g_treeMul = 1.0f;
 static double g_dRange = 200.0, g_dRangeM1 = 199.0;
 
 static int same(Module m, DWORD va, const char* hex)
@@ -132,6 +133,36 @@ void gfx_init(Module m)
         int ok = 0, bad = 0; g_fSplit = split;
         redirect(m, 0xC32D35, 0xD9, 0x05, 0x13200D0, &g_fSplit, &ok, &bad);
         logf(ok ? "Graphics: shadow split weight changed" : "Graphics: split weight site mismatch -> skipped");
+    }
+
+    /* ---- character shadow map resolution ----
+       CCharacterShadowMap::Init (0xC3E800) hard-codes a 1024x1024 R32F map with a hard depth compare (VSM forced off):
+       0xC3E840 mov dword [esi+28h],400h (size field) / 0xC3E85E push 400h / 0xC3E863 push 400h (CreateRenderedTexture
+       w, h). Over a dragon this gives large stair steps. No other code of the class uses the literal size. */
+    int css = GetPrivateProfileIntA(S, "CharacterShadowSize", 1024, g_ini);
+    if (css != 1024) {
+        if (css != 2048 && css != 4096) logf("Graphics: CharacterShadowSize=%d not supported (1024/2048/4096) -> unchanged", css);
+        else if (same(m, 0xC3E840, "c74628") && same(m, 0xC3E843, "00040000") && same(m, 0xC3E85E, "6800040000") && same(m, 0xC3E863, "6800040000")) {
+            DWORD v = (DWORD)css;
+            if (write_mem(VA(m, 0xC3E843), &v, 4) && write_mem(VA(m, 0xC3E85F), &v, 4) && write_mem(VA(m, 0xC3E864), &v, 4))
+                logf("Graphics: character shadow map %d (game: 1024)", css);
+        } else logf("Graphics: character shadow map site mismatch -> unchanged");
+    }
+
+    /* ---- tree (SpeedTree) draw distance ----
+       The graphics settings object keeps "TreeQualityMultiplier" (graphicoptions.xml, menu max 3) at +0x68; its only
+       reader is the getter 0x6A2C20 (fld [ecx+68h]; ret), called from the SpeedTree code at 0xC8C92A and 0xC8CE3E.
+       Raising the value to 6 in graphicoptions.xml moved the tree pop-in much farther (tested 28.10). The setter
+       would reset it to the menu value, so instead the getter returns our value:
+       0x6A2C20: fld dword [g_treeMul]; ret  (7 bytes; 12 bytes of int3 padding follow the original 4). */
+    float tm = ini_float(S, "TreeDistanceMultiplier", 0.0f);
+    if (tm > 0.0f) {
+        if (tm < 1.0f) tm = 1.0f; if (tm > 10.0f) tm = 10.0f;
+        if (same(m, 0x6A2C20, "d94168c3cccccccccccc") && same(m, 0xC8C92A, "e8") && same(m, 0xC8CE3E, "e8")) {
+            g_treeMul = tm;
+            BYTE c[7] = { 0xD9, 0x05, 0, 0, 0, 0, 0xC3 }; *(DWORD*)(c + 2) = (DWORD)&g_treeMul;
+            if (write_mem(VA(m, 0x6A2C20), c, 7)) logf("Graphics: tree distance multiplier %d.%01d (game menu: up to 3)", (int)tm, (int)(tm * 10) % 10);
+        } else logf("Graphics: tree distance site mismatch -> unchanged");
     }
 
     /* ---- every object category casts shadows into every cascade ---- */

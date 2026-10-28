@@ -27,3 +27,16 @@ void window_init(Module m, HMODULE self);
 void input_on_dinput(void* di);
 void diag_on_dinput(void* idi8);
 void* detour(void* target, void* hook);
+/* texture statistics module (texmgr.c), driven by diag.c */
+int texmgr_wanted(void);
+void texmgr_init(Module m);
+void texmgr_on_device(void* dev);
+void texmgr_frame(int recording);
+void texmgr_rec_start(int maxFrames);
+void texmgr_report(const char* txt, const char* csv, const float* dt, int n);
+DWORD texmgr_frame_work_us(int i);
+/* sampling profiler (profiler.c), driven by diag.c */
+void prof_init(void);
+void prof_rec_start(void);
+void prof_frame(int idx, float ms);
+void prof_report(const char* txt, const char* csv, const float* dt, int n);

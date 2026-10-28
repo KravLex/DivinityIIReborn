@@ -1,0 +1,51 @@
+diff --git a/src/d3d9/d3d9_device.cpp b/src/d3d9/d3d9_device.cpp
+index a67e9e9..ef5a955 100644
+--- a/src/d3d9/d3d9_device.cpp
++++ b/src/d3d9/d3d9_device.cpp
+@@ -4831,12 +4831,16 @@ namespace dxvk {
+   void D3D9DeviceEx::ThrottleAllocation() {
+     // Threshold at which to submit eagerly. This is useful to ensure
+     // that staging buffer memory gets recycled relatively soon.
+-    constexpr VkDeviceSize MaxMemoryPerSubmission = (env::is32BitHostPlatform() ? 10u : 30u) << 20u;
++    // d3d9.stagingMemoryPerSubmission overrides it (MB), e.g. for games uploading large textures.
++    const int32_t stagingOption = std::clamp(m_d3d9Options.stagingMemoryPerSubmission, 0, 256);
++    const VkDeviceSize MaxMemoryPerSubmission = stagingOption
++      ? VkDeviceSize(stagingOption) << 20u
++      : VkDeviceSize(env::is32BitHostPlatform() ? 10u : 30u) << 20u;
+ 
+     // Treshold for staging memory in flight. Since the staging buffer granularity
+     // is somewhat coars, it is possible for one additional allocation to be in use,
+     // but otherwise this is a hard upper bound.
+-    constexpr VkDeviceSize MaxMemoryInFlight = MaxMemoryPerSubmission * 3u;
++    const VkDeviceSize MaxMemoryInFlight = MaxMemoryPerSubmission * 3u;
+ 
+     DxvkStagingBufferStats stats = GetStagingMemoryStatistics();
+ 
+diff --git a/src/d3d9/d3d9_options.cpp b/src/d3d9/d3d9_options.cpp
+index 08278eb..d3dd5f8 100644
+--- a/src/d3d9/d3d9_options.cpp
++++ b/src/d3d9/d3d9_options.cpp
+@@ -74,6 +74,7 @@ namespace dxvk {
+     this->skipManagedTextureInit        = config.getOption<bool>        ("d3d9.skipManagedTextureInit",        false);
+     this->uploadManagedOnUnlock         = config.getOption<bool>        ("d3d9.uploadManagedOnUnlock",         false);
+     this->asyncManagedUpload            = config.getOption<bool>        ("d3d9.asyncManagedUpload",            false);
++    this->stagingMemoryPerSubmission    = config.getOption<int32_t>     ("d3d9.stagingMemoryPerSubmission",    0);
+     this->deviceLossOnFocusLoss         = config.getOption<bool>        ("d3d9.deviceLossOnFocusLoss",         false);
+     this->samplerLodBias                = config.getOption<float>       ("d3d9.samplerLodBias",                0.0f);
+     this->clampNegativeLodBias          = config.getOption<bool>        ("d3d9.clampNegativeLodBias",          false);
+diff --git a/src/d3d9/d3d9_options.h b/src/d3d9/d3d9_options.h
+index c13aac3..a8162a5 100644
+--- a/src/d3d9/d3d9_options.h
++++ b/src/d3d9/d3d9_options.h
+@@ -164,6 +164,11 @@ namespace dxvk {
+     /// instead of the application thread when uploading it.
+     bool asyncManagedUpload;
+ 
++    /// Staging memory (in MB) after which uploads are submitted eagerly;
++    /// three times this amount may be in flight before the app waits.
++    /// 0 = DXVK default (10 MB on 32-bit, 30 MB on 64-bit).
++    int32_t stagingMemoryPerSubmission;
++
+     /// Shader dump path
+     std::string shaderDumpPath;
+ 

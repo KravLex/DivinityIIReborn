@@ -1,0 +1,273 @@
+diff --git a/src/d3d9/d3d9_common_texture.h b/src/d3d9/d3d9_common_texture.h
+index 5989859..04f7d8d 100644
+--- a/src/d3d9/d3d9_common_texture.h
++++ b/src/d3d9/d3d9_common_texture.h
+@@ -257,6 +257,26 @@ namespace dxvk {
+       m_data.unmap();
+     }
+ 
++#ifdef DXVK_USE_UNMAPPABLE_MEMORY
++    /**
++     * \brief Pins the unmappable system memory copy
++     *
++     * Returns an independent, thread-safe mapping of the whole copy
++     * (empty if the data lives in a buffer instead). Used to read
++     * the data on the CS thread (d3d9.asyncManagedUpload).
++     */
++    MemoryFilePin PinData() const {
++      if (m_buffer != nullptr || m_data.allocation() < 0)
++        return MemoryFilePin();
++
++      return MemoryFilePin(m_data);
++    }
++
++    uint32_t GetMemoryOffset(UINT Subresource) const {
++      return m_memoryOffset[Subresource];
++    }
++#endif
++
+     /**
+      * \brief Destroys a buffer
+      * Destroys mapping and staging buffers for a given subresource
+diff --git a/src/d3d9/d3d9_device.cpp b/src/d3d9/d3d9_device.cpp
+index 0659798..a67e9e9 100644
+--- a/src/d3d9/d3d9_device.cpp
++++ b/src/d3d9/d3d9_device.cpp
+@@ -5363,10 +5363,61 @@ namespace dxvk {
+           + srcOffsetBlockCount.y * pitch
+           + srcOffsetBlockCount.x * formatInfo->elementSize;
+ 
++      VkDeviceSize dirtySize = extentBlockCount.width * extentBlockCount.height * extentBlockCount.depth * formatInfo->elementSize;
++
++#ifdef DXVK_USE_UNMAPPABLE_MEMORY
++      // d3d9.asyncManagedUpload: the system memory copy of a managed texture is read and packed
++      // into the staging buffer on the CS thread. The application thread only pins (maps) the
++      // copy, which keeps it mapped and allocated until the CS command has run, even if the
++      // texture is unmapped by the LRU or released meanwhile.
++      if (unlikely(m_d3d9Options.asyncManagedUpload)
++       && pSrcTexture == pDestTexture
++       && pSrcTexture->IsManaged()
++       && pSrcTexture->GetMapMode() == D3D9_COMMON_TEXTURE_MAP_MODE_UNMAPPABLE) {
++        MemoryFilePin pin = pSrcTexture->PinData();
++
++        if (pin) {
++          D3D9BufferSlice slice = AllocStagingBuffer(dirtySize);
++          VkFormat packedDSFormat = GetPackedDepthStencilFormat(pDestTexture->Desc()->Format);
++
++          EmitCs([
++            cPin            = std::move(pin),
++            cSrcOffset      = VkDeviceSize(pSrcTexture->GetMemoryOffset(SrcSubresource)) + copySrcOffset,
++            cDstPtr         = slice.mapPtr,
++            cBlockCount     = extentBlockCount,
++            cElementSize    = VkDeviceSize(formatInfo->elementSize),
++            cPitch          = pitch,
++            cSlicePitch     = pitch * srcTexLevelExtentBlockCount.height,
++            cSrcSlice       = slice.slice,
++            cDstImage       = image,
++            cDstLayers      = dstLayers,
++            cDstLevelExtent = alignedExtent,
++            cOffset         = alignedDestOffset,
++            cPackedDSFormat = packedDSFormat
++          ] (DxvkContext* ctx) mutable {
++            util::packImageData(
++              cDstPtr, reinterpret_cast<const uint8_t*>(cPin.ptr()) + cSrcOffset,
++              cBlockCount, cElementSize, cPitch, cSlicePitch);
++            cPin.release();
++
++            ctx->copyBufferToImage(
++              cDstImage,  cDstLayers,
++              cOffset, cDstLevelExtent,
++              cSrcSlice.buffer(), cSrcSlice.offset(),
++              0, 0, cPackedDSFormat);
++          });
++
++          TrackTextureMappingBufferSequenceNumber(pSrcTexture, SrcSubresource);
++          UnmapTextures();
++          ConsiderFlush(GpuFlushType::ImplicitWeakHint);
++          return;
++        }
++      }
++#endif
++
+       // Get the mapping pointer from MapTexture to map the texture and keep track of that
+       // in case it is unmappable.
+       const void* mapPtr = MapTexture(pSrcTexture, SrcSubresource);
+-      VkDeviceSize dirtySize = extentBlockCount.width * extentBlockCount.height * extentBlockCount.depth * formatInfo->elementSize;
+       D3D9BufferSlice slice = AllocStagingBuffer(dirtySize);
+       const void* srcData = reinterpret_cast<const uint8_t*>(mapPtr) + copySrcOffset;
+       util::packImageData(
+diff --git a/src/d3d9/d3d9_options.cpp b/src/d3d9/d3d9_options.cpp
+index 7f3be03..08278eb 100644
+--- a/src/d3d9/d3d9_options.cpp
++++ b/src/d3d9/d3d9_options.cpp
+@@ -73,6 +73,7 @@ namespace dxvk {
+     this->textureMemory                 = config.getOption<int32_t>     ("d3d9.textureMemory",                 100) << 20;
+     this->skipManagedTextureInit        = config.getOption<bool>        ("d3d9.skipManagedTextureInit",        false);
+     this->uploadManagedOnUnlock         = config.getOption<bool>        ("d3d9.uploadManagedOnUnlock",         false);
++    this->asyncManagedUpload            = config.getOption<bool>        ("d3d9.asyncManagedUpload",            false);
+     this->deviceLossOnFocusLoss         = config.getOption<bool>        ("d3d9.deviceLossOnFocusLoss",         false);
+     this->samplerLodBias                = config.getOption<float>       ("d3d9.samplerLodBias",                0.0f);
+     this->clampNegativeLodBias          = config.getOption<bool>        ("d3d9.clampNegativeLodBias",          false);
+diff --git a/src/d3d9/d3d9_options.h b/src/d3d9/d3d9_options.h
+index 8766945..c13aac3 100644
+--- a/src/d3d9/d3d9_options.h
++++ b/src/d3d9/d3d9_options.h
+@@ -160,6 +160,10 @@ namespace dxvk {
+     /// Upload unmappable managed textures when a level is unlocked instead of at the first draw.
+     bool uploadManagedOnUnlock;
+ 
++    /// Copy managed texture data into the staging buffer on the CS thread
++    /// instead of the application thread when uploading it.
++    bool asyncManagedUpload;
++
+     /// Shader dump path
+     std::string shaderDumpPath;
+ 
+diff --git a/src/util/util_unmap.cpp b/src/util/util_unmap.cpp
+index 40678d4..b23842c 100644
+--- a/src/util/util_unmap.cpp
++++ b/src/util/util_unmap.cpp
+@@ -141,6 +141,20 @@ namespace dxvk {
+   void MemoryFilePool::free(int32_t allocation) {
+     std::lock_guard lock(m_mutex);
+ 
++    auto& allocInfo = m_allocations.at(allocation);
++
++    // Still mapped by a MemoryFilePin (asynchronous upload in flight):
++    // the last unmap releases the memory.
++    if (allocInfo.mapCount) {
++      allocInfo.freePending = true;
++      return;
++    }
++
++    freeLocked(allocation);
++  }
++
++
++  void MemoryFilePool::freeLocked(int32_t allocation) {
+     auto& allocInfo = m_allocations.at(allocation);
+     m_memoryUsed -= allocInfo.size;
+ 
+@@ -245,6 +259,9 @@ namespace dxvk {
+       }
+ 
+       allocInfo.mapPtr = nullptr;
++
++      if (allocInfo.freePending)
++        freeLocked(allocation);
+     }
+   }
+ 
+diff --git a/src/util/util_unmap.h b/src/util/util_unmap.h
+index fc20fcd..af67c0a 100644
+--- a/src/util/util_unmap.h
++++ b/src/util/util_unmap.h
+@@ -181,6 +181,7 @@ namespace dxvk {
+       size_t      size      = 0u;
+       void*       mapPtr    = nullptr;
+       size_t      mapCount  = 0u;
++      bool        freePending = false;
+     };
+ 
+     dxvk::mutex m_mutex;
+@@ -201,6 +202,8 @@ namespace dxvk {
+ 
+     void freeChunk(uint32_t index);
+ 
++    void freeLocked(int32_t allocation);
++
+   };
+ 
+ 
+@@ -275,6 +278,17 @@ namespace dxvk {
+       return m_allocation > 0;;
+     }
+ 
++    /**
++     * \brief Pool and allocation index (for MemoryFilePin)
++     */
++    MemoryFilePool* pool() const {
++      return m_pool;
++    }
++
++    int32_t allocation() const {
++      return m_allocation;
++    }
++
+   private:
+ 
+     MemoryFilePool* m_pool        = nullptr;
+@@ -291,6 +305,73 @@ namespace dxvk {
+     }
+ 
+   };
++  /**
++   * \brief Independent mapping of an unmappable allocation
++   *
++   * Holds its own map reference on the allocation, so the memory stays mapped
++   * and allocated while the pin exists, even if the owning region unmaps or
++   * frees it in the meantime (the free is then deferred to the last unmap).
++   * Mapping and unmapping are serialized by the pool, so a pin may be created
++   * on one thread and released on another (e.g. the CS thread).
++   */
++  class MemoryFilePin {
++
++  public:
++
++    MemoryFilePin() = default;
++
++    explicit MemoryFilePin(const MemoryFileRegion& region)
++    : m_pool(region.pool()), m_allocation(region.allocation()) {
++      if (m_pool && m_allocation >= 0)
++        m_mapPtr = m_pool->map(m_allocation);
++      else
++        m_pool = nullptr;
++    }
++
++    ~MemoryFilePin() {
++      release();
++    }
++
++    MemoryFilePin(MemoryFilePin&& other)
++    : m_pool      (std::exchange(other.m_pool,       nullptr))
++    , m_allocation(std::exchange(other.m_allocation, -1))
++    , m_mapPtr    (std::exchange(other.m_mapPtr,     nullptr)) { }
++
++    MemoryFilePin& operator = (MemoryFilePin&& other) {
++      release();
++      m_pool       = std::exchange(other.m_pool,       nullptr);
++      m_allocation = std::exchange(other.m_allocation, -1);
++      m_mapPtr     = std::exchange(other.m_mapPtr,     nullptr);
++      return *this;
++    }
++
++    MemoryFilePin(const MemoryFilePin&) = delete;
++    MemoryFilePin& operator = (const MemoryFilePin&) = delete;
++
++    const void* ptr() const {
++      return m_mapPtr;
++    }
++
++    explicit operator bool () const {
++      return m_mapPtr != nullptr;
++    }
++
++    void release() {
++      if (m_pool && m_allocation >= 0)
++        m_pool->unmap(m_allocation);
++
++      m_pool       = nullptr;
++      m_allocation = -1;
++      m_mapPtr     = nullptr;
++    }
++
++  private:
++
++    MemoryFilePool* m_pool        = nullptr;
++    int32_t         m_allocation  = -1;
++    void*           m_mapPtr      = nullptr;
++
++  };
+ #else
+   /**
+    * \brief Dummy memory file pool

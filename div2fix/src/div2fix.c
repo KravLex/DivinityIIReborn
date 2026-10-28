@@ -388,7 +388,7 @@ BOOL WINAPI DllMain(HMODULE self, DWORD reason, void* reserved)
         g_logOn = GetPrivateProfileIntA("General", "Log", 1, g_ini);
         if (g_logOn) { HANDLE h = CreateFileA(g_log, GENERIC_WRITE, 1, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0); if (h != INVALID_HANDLE_VALUE) CloseHandle(h); }
         char exe[MAX_PATH]; GetModuleFileNameA(0, exe, MAX_PATH);
-        logf("Div2Fix 1.3 (Divinity II Reborn) loaded into %s", exe);
+        logf("Div2Fix 1.4.1 (Divinity II Reborn) loaded into %s", exe);
         Module m = main_module();
         version_check(m);
         if (GetPrivateProfileIntA("KeyNames", "Enable", 1, g_ini)) apply_keynames(m); else logf("KeyNames: disabled in ini");
@@ -401,6 +401,7 @@ BOOL WINAPI DllMain(HMODULE self, DWORD reason, void* reserved)
         uitext_init(m);
         window_init(m, self);
         diag_init(m);
+        texmgr_init(m);
     }
     return 1;
 }

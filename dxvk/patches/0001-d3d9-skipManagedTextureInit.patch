@@ -1,0 +1,52 @@
+diff --git a/src/d3d9/d3d9_initializer.cpp b/src/d3d9/d3d9_initializer.cpp
+index 469eebf..4ead0a1 100644
+--- a/src/d3d9/d3d9_initializer.cpp
++++ b/src/d3d9/d3d9_initializer.cpp
+@@ -44,6 +44,20 @@ namespace dxvk {
+     if (pTexture->GetMapMode() == D3D9_COMMON_TEXTURE_MAP_MODE_NONE)
+       return;
+ 
++    // Zeroing the unmappable copy of a managed texture costs a map, a page fault per page
++    // and a full memset, all on the application thread. Games that write every level
++    // before using the texture can skip it (d3d9.skipManagedTextureInit).
++    if (!pInitialData
++     && pTexture->Desc()->Pool == D3DPOOL_MANAGED
++     && pTexture->GetMapMode() == D3D9_COMMON_TEXTURE_MAP_MODE_UNMAPPABLE
++     && m_parent->GetOptions()->skipManagedTextureInit) {
++      if (pTexture->GetImage() != nullptr)
++        InitDeviceLocalTexture(pTexture);
++
++      SyncSharedTexture(pTexture);
++      return;
++    }
++
+     void* mapPtr = nullptr;
+ 
+     if (pTexture->Desc()->Pool != D3DPOOL_DEFAULT) {
+diff --git a/src/d3d9/d3d9_options.cpp b/src/d3d9/d3d9_options.cpp
+index e46864e..cf39326 100644
+--- a/src/d3d9/d3d9_options.cpp
++++ b/src/d3d9/d3d9_options.cpp
+@@ -71,6 +71,7 @@ namespace dxvk {
+     this->ignoreDefaultBufferLockRange  = config.getOption<bool>        ("d3d9.ignoreDefaultBufferLockRange",  false);
+     this->seamlessCubes                 = config.getOption<bool>        ("d3d9.seamlessCubes",                 false);
+     this->textureMemory                 = config.getOption<int32_t>     ("d3d9.textureMemory",                 100) << 20;
++    this->skipManagedTextureInit        = config.getOption<bool>        ("d3d9.skipManagedTextureInit",        false);
+     this->deviceLossOnFocusLoss         = config.getOption<bool>        ("d3d9.deviceLossOnFocusLoss",         false);
+     this->samplerLodBias                = config.getOption<float>       ("d3d9.samplerLodBias",                0.0f);
+     this->clampNegativeLodBias          = config.getOption<bool>        ("d3d9.clampNegativeLodBias",          false);
+diff --git a/src/d3d9/d3d9_options.h b/src/d3d9/d3d9_options.h
+index e69a39a..835000d 100644
+--- a/src/d3d9/d3d9_options.h
++++ b/src/d3d9/d3d9_options.h
+@@ -153,6 +153,10 @@ namespace dxvk {
+     /// How much virtual memory will be used for textures (in MB).
+     int32_t textureMemory;
+ 
++    /// Do not zero the unmappable system-memory copy of new managed textures.
++    /// Only safe for games that write every level before using the texture.
++    bool skipManagedTextureInit;
++
+     /// Shader dump path
+     std::string shaderDumpPath;
+ 

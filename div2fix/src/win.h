@@ -17,6 +17,7 @@ typedef int (__stdcall *FARPROC)(void);
 #define INVALID_HANDLE_VALUE ((HANDLE)(long)-1)
 typedef struct { void* BaseAddress; void* AllocationBase; DWORD AllocationProtect; SIZE_T RegionSize; DWORD State; DWORD Protect; DWORD Type; } MEMORY_BASIC_INFORMATION;
 #define MEM_COMMIT 0x1000
+#define MEM_FREE 0x10000
 #define PAGE_NOACCESS 0x01
 #define PAGE_GUARD 0x100
 __declspec(dllimport) HMODULE WINAPI GetModuleHandleA(LPCSTR);
@@ -69,6 +70,29 @@ __declspec(dllimport) DWORD WINAPI GetCurrentThreadId(void);
 __declspec(dllimport) BOOL WINAPI ReadFile(HANDLE, void*, DWORD, DWORD*, void*);
 __declspec(dllimport) DWORD WINAPI GetFileSize(HANDLE, DWORD*);
 __declspec(dllimport) BOOL WINAPI WritePrivateProfileStringA(LPCSTR, LPCSTR, LPCSTR, LPCSTR);
+__declspec(dllimport) DWORD WINAPI TlsAlloc(void);
+__declspec(dllimport) void* WINAPI TlsGetValue(DWORD);
+__declspec(dllimport) BOOL WINAPI TlsSetValue(DWORD, void*);
+#define TLS_OUT_OF_INDEXES 0xFFFFFFFF
+/* sampling profiler */
+typedef struct { void* lpBaseOfDll; DWORD SizeOfImage; void* EntryPoint; } MODULEINFO;
+__declspec(dllimport) HANDLE WINAPI OpenThread(DWORD, BOOL, DWORD);
+__declspec(dllimport) DWORD WINAPI SuspendThread(HANDLE);
+__declspec(dllimport) DWORD WINAPI ResumeThread(HANDLE);
+__declspec(dllimport) BOOL WINAPI GetThreadContext(HANDLE, void*);
+__declspec(dllimport) BOOL WINAPI SetThreadPriority(HANDLE, int);
+__declspec(dllimport) HANDLE WINAPI GetCurrentThread(void);
+__declspec(dllimport) BOOL WINAPI K32EnumProcessModules(HANDLE, HMODULE*, DWORD, DWORD*);
+__declspec(dllimport) BOOL WINAPI K32GetModuleInformation(HANDLE, HMODULE, MODULEINFO*, DWORD);
+__declspec(dllimport) HANDLE WINAPI CreateWaitableTimerExW(void*, const unsigned short*, DWORD, DWORD);
+__declspec(dllimport) BOOL WINAPI SetWaitableTimer(HANDLE, const long long*, long, void*, void*, BOOL);
+__declspec(dllimport) DWORD WINAPI WaitForSingleObject(HANDLE, DWORD);
+#define THREAD_SUSPEND_RESUME 0x0002
+#define THREAD_GET_CONTEXT 0x0008
+#define THREAD_QUERY_INFORMATION 0x0040
+#define THREAD_PRIORITY_TIME_CRITICAL 15
+#define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
+#define TIMER_ALL_ACCESS 0x1F0003
 #define GENERIC_READ 0x80000000
 #define FILE_SHARE_READ 1
 #define OPEN_EXISTING 3

@@ -125,22 +125,33 @@ static void rec_stop(const char* why);
  * NiDX9 can use either). The first path seen becomes the frame clock; the other is ignored so a
  * frame is never counted twice. */
 static int g_clock;                    /* 0 = undecided, 1 = device Present, 2 = swapchain Present */
+/* automatic recording for reproducible before/after runs: [Diagnostics] AutoStartSec (0 = off), AutoDurationSec */
+static int g_autoStart, g_autoDur, g_autoDone;
+static long long g_firstQpc;
 static void frame_tick(int src)
 {
     if (g_clock == 0) { g_clock = src; logf("Diagnostics: frame clock = %s", src == 1 ? "IDirect3DDevice9::Present" : "IDirect3DSwapChain9::Present"); }
     if (g_clock != src) return;
     long long now; QueryPerformanceCounter(&now);
+    int stored = 0;
     if (g_lastQpc && g_rec) {
         if (g_n < g_maxFrames) {
             g_dt[g_n] = (float)((double)(now - g_lastQpc) * 1000.0 / (double)g_qpf);
             g_cam[g_n] = (BYTE)(__sync_lock_test_and_set(&g_mouseAccum, 0) > 0);
-            g_n++;
+            g_n++; stored = 1;
         } else rec_stop("buffer full");
     } else {
         __sync_lock_test_and_set(&g_mouseAccum, 0);
     }
+    texmgr_frame(stored);              /* same frame interval as g_dt[g_n - 1] */
+    prof_frame(stored ? g_n - 1 : -1, stored ? g_dt[g_n - 1] : 0);
     g_lastQpc = now;
+    if (!g_firstQpc) g_firstQpc = now;
 
+    if (g_autoStart && !g_autoDone) {
+        if (!g_rec && now - g_firstQpc >= (long long)g_autoStart * g_qpf) { logf("Diagnostics: automatic recording (%d s)", g_autoDur); rec_start(); }
+        else if (g_rec && now - g_recStart >= (long long)g_autoDur * g_qpf) { g_autoDone = 1; rec_stop("auto"); }
+    }
     int k = (GetAsyncKeyState(g_hotkey) & 0x8000) != 0;
     if (k && !g_keyPrev) { if (g_rec) rec_stop("hotkey"); else rec_start(); }
     g_keyPrev = k;
@@ -199,6 +210,11 @@ static long WINAPI hk_Reset(void* dev, void* pp)
 static void hook_slot(void** slot, void* hook, void** orig)
 {
     if (*slot == hook) return;          /* already hooked (shared vtable) */
+    if (*orig) {                        /* hooked before, and another hook (window.c, an overlay) chained on top of ours:
+                                           hooking again would store that hook as our original -> endless call loop */
+        logf("  hook slot %08X: already chained (%08X), left as is", (DWORD)slot, (DWORD)*slot);
+        return;
+    }
     void* prev = *slot;
     *orig = prev;
     int ok = write_mem(slot, &hook, 4);
@@ -210,6 +226,7 @@ static long WINAPI hk_CreateDevice(void* d3d, UINT adapter, DWORD type, void* hw
     long hr = g_origCreateDevice(d3d, adapter, type, hwnd, flags, pp, out);
     if (hr >= 0 && out && *out) shadow_on_device(*out);
     if (!g_on) return hr;
+    if (hr >= 0 && out && *out) texmgr_on_device(*out);
     note_pp("CreateDevice", (const D3DPP*)pp, hr);
     if (hr >= 0 && out && *out) {
         void** vt = *(void***)*out;
@@ -356,7 +373,7 @@ static long WINAPI hk_DICreateDevice(void* di, const GUID* g, void** out, void* 
         for (int i = 0; i < 16; i++) if (a[i] != b[i]) eq = 0;
         if (eq) {
             for (int i = 0; i < 4; i++) if (!g_mouseDev[i]) { g_mouseDev[i] = *out; break; }
-            void** vt = *(void***)*out;
+            void** vt = *(void***)*out;      /* shared by all devices; window.c chains on top (hook_slot keeps that) */
             hook_slot(&vt[9], (void*)hk_GDS, (void**)&g_origGDS);
             hook_slot(&vt[10], (void*)hk_GDD, (void**)&g_origGDD);
             logf("Diagnostics: mouse device %08X tracked for camera-motion statistics", (DWORD)*out);
@@ -372,6 +389,36 @@ void diag_on_dinput(void* idi8)
     hook_slot(&vt[3], (void*)hk_DICreateDevice, (void**)&g_origDICreate);
 }
 
+/* ================= 32-bit address space ================= */
+/* The game is a 32-bit LAA process (4 GB of address space). Private bytes do not show reserved-but-uncommitted
+   ranges or fragmentation, so walk the whole address space: used = everything not free, plus the largest free
+   block (a big texture or archive buffer needs one contiguous range). Values in MB. */
+typedef struct { DWORD usedMB, freeMB, largestMB, privMB; } AddrSpace;
+static void addr_space(AddrSpace* a)
+{
+    MEMORY_BASIC_INFORMATION mi; DWORD p = 0x10000, usedKB = 0, freeKB = 0, bigKB = 0;
+    while (p < 0xFFFF0000 && VirtualQuery((void*)p, &mi, sizeof mi)) {
+        DWORD kb = mi.RegionSize >> 10;
+        if (mi.State == MEM_FREE) { freeKB += kb; if (kb > bigKB) bigKB = kb; } else usedKB += kb;
+        DWORD next = (DWORD)mi.BaseAddress + mi.RegionSize;
+        if (next <= p) break;               /* wrapped past 4 GB */
+        p = next;
+    }
+    PROCESS_MEMORY_COUNTERS_EX pm; pm.cb = sizeof pm; K32GetProcessMemoryInfo(GetCurrentProcess(), &pm, sizeof pm);
+    a->usedMB = usedKB >> 10; a->freeMB = freeKB >> 10; a->largestMB = bigKB >> 10; a->privMB = (DWORD)(pm.PrivateUsage >> 20);
+}
+static AddrSpace g_asStart, g_asMin;        /* at recording start; lowest free / largest block during the recording */
+static DWORD WINAPI addr_monitor(void* arg)
+{
+    DWORD every = (DWORD)arg;
+    for (;;) {
+        AddrSpace a; addr_space(&a);
+        if (g_rec) { if (a.freeMB < g_asMin.freeMB) g_asMin.freeMB = a.freeMB; if (a.largestMB < g_asMin.largestMB) g_asMin.largestMB = a.largestMB; }
+        logf("Memory: address space used %u MB, free %u MB, largest free block %u MB; private %u MB", a.usedMB, a.freeMB, a.largestMB, a.privMB);
+        Sleep(every * 1000);
+    }
+}
+
 /* ================= recording & report ================= */
 static void rec_start(void)
 {
@@ -381,8 +428,11 @@ static void rec_start(void)
         if (!g_dt || !g_cam) { logf("Diagnostics: cannot allocate buffers"); return; }
     }
     g_n = 0; g_rec = 1; g_lastQpc = 0;
+    texmgr_rec_start(g_maxFrames);
+    prof_rec_start();
     QueryPerformanceCounter(&g_recStart);
     g_memStart.cb = sizeof g_memStart; K32GetProcessMemoryInfo(GetCurrentProcess(), &g_memStart, sizeof g_memStart);
+    addr_space(&g_asStart); g_asMin = g_asStart;
     logf("Diagnostics: recording started");
 }
 
@@ -467,6 +517,10 @@ static void rec_stop(const char* why)
         wsprintfA(b, "Memory: working set %d MB -> %d MB (peak %d MB), private %d MB -> %d MB\r\n",
                   (int)(g_memStart.WorkingSetSize >> 20), (int)(me.WorkingSetSize >> 20), (int)(me.PeakWorkingSetSize >> 20),
                   (int)(g_memStart.PrivateUsage >> 20), (int)(me.PrivateUsage >> 20)); w_puts(&w, b);
+        AddrSpace ae; addr_space(&ae);
+        wsprintfA(b, "Address space (of 4096 MB): used %u -> %u MB, free %u -> %u MB (lowest %u), largest free block %u -> %u MB (lowest %u)\r\n",
+                  g_asStart.usedMB, ae.usedMB, g_asStart.freeMB, ae.freeMB, g_asMin.freeMB < ae.freeMB ? g_asMin.freeMB : ae.freeMB,
+                  g_asStart.largestMB, ae.largestMB, g_asMin.largestMB < ae.largestMB ? g_asMin.largestMB : ae.largestMB); w_puts(&w, b);
         write_stats(&w, "All frames", &all);
         write_stats(&w, "Camera moving (mouse input during frame)", &mov);
         write_stats(&w, "Camera still", &still);
@@ -495,6 +549,14 @@ static void rec_stop(const char* why)
         }
         w_close(&w);
     }
+    char ttxt[MAX_PATH], tcsv[MAX_PATH];
+    wsprintfA(ttxt, "%sDiv2Fix_tex_%04d%02d%02d_%02d%02d%02d.txt", g_dir, t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond);
+    wsprintfA(tcsv, "%sDiv2Fix_tex_%04d%02d%02d_%02d%02d%02d.csv", g_dir, t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond);
+    texmgr_report(ttxt, g_writeCsv ? tcsv : 0, g_dt, g_n);
+    char ptxt[MAX_PATH], pcsv[MAX_PATH];
+    wsprintfA(ptxt, "%sDiv2Fix_prof_%04d%02d%02d_%02d%02d%02d.txt", g_dir, t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond);
+    wsprintfA(pcsv, "%sDiv2Fix_prof_%04d%02d%02d_%02d%02d%02d.csv", g_dir, t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond);
+    prof_report(ptxt, pcsv, g_dt, g_n);
     logf("Diagnostics: recording stopped (%s), %d frames -> %s", why, g_n, path);
     g_lastQpc = 0;
 }
@@ -525,6 +587,20 @@ void diag_init(Module m)
     if (sf < 120) sf = 120; if (sf > 1000) sf = 1000;
     g_spikeFactor = sf / 100.0f;
     g_writeCsv = GetPrivateProfileIntA("Diagnostics", "WriteCsv", 1, g_ini);
+    g_autoStart = GetPrivateProfileIntA("Diagnostics", "AutoStartSec", 0, g_ini);
+    g_autoDur = GetPrivateProfileIntA("Diagnostics", "AutoDurationSec", 60, g_ini);
+    if (g_autoStart < 0) g_autoStart = 0;
+    if (g_autoDur < 5) g_autoDur = 5; if (g_autoDur > maxSec * 60) g_autoDur = maxSec * 60;
+    if (g_autoStart) logf("Diagnostics: automatic recording %d s after the first frame, for %d s", g_autoStart, g_autoDur);
+    /* [Diagnostics] AddressSpaceLogSec: address-space line in Div2Fix.log every N seconds (0 = off), so the last
+       state before a crash is on disk */
+    prof_init();
+    int asSec = GetPrivateProfileIntA("Diagnostics", "AddressSpaceLogSec", 15, g_ini);
+    if (asSec > 0) {
+        if (asSec < 5) asSec = 5;
+        HANDLE th = CreateThread(0, 0, addr_monitor, (void*)asSec, 0, 0);
+        if (th) CloseHandle(th);
+    }
     QueryPerformanceFrequency(&g_qpf);
     if (hook_import(m, "KERNEL32.dll", "GetProcAddress", (void*)hk_GetProcAddress, (void**)&g_realGPA))
         logf("Diagnostics: enabled (hotkey VK %02X, max %d min). Waiting for Direct3DCreate9...", (DWORD)g_hotkey, maxSec);

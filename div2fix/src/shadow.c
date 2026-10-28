@@ -24,6 +24,7 @@ typedef unsigned long (WINAPI *Rel_t)(void*);
 static CreateTexture_t g_oCT; static SetRT_t g_oRT; static SetPS_t g_oPS; static DIP_t g_oDIP; static DP_t g_oDP;
 static SetPSC_t g_SetPSC; static SetSS_t g_SetSS;
 static float g_soft = 1.0f;
+static int g_float32;                   /* [Graphics] ShadowFloat32 */
 static void* g_fixedPS; static int g_fixFail;
 static void* g_surf[16]; static UINT g_size[16]; static int g_nsurf;
 static UINT g_rtSize;                   /* size of the current render target 0 if it is a shadow map, else 0 */
@@ -111,6 +112,9 @@ typedef long (WINAPI *CreateDS_t)(void*, UINT, UINT, DWORD, DWORD, DWORD, int, v
 static CreateDS_t g_oDS;
 static long WINAPI hk_DS(void* dev, UINT w, UINT h, DWORD fmt, DWORD ms, DWORD q, int disc, void** out, void* sh)
 {
+    static DWORD seen[32][3]; static int nseen;   /* diagnostics: every distinct depth surface once */
+    int dup = 0; for (int i = 0; i < nseen; i++) if (seen[i][0] == w && seen[i][1] == h && seen[i][2] == fmt) dup = 1;
+    if (!dup && nseen < 32) { seen[nseen][0] = w; seen[nseen][1] = h; seen[nseen][2] = fmt; nseen++; logf("Shadow/Depth: depth-stencil surface %ux%u fmt %u (first of this kind)", w, h, fmt); }
     if (g_bloomScale > 1 && w < 2048) {
         UINT bh, bw = bb_w(dev, &bh);
         if (bw && w == bw / 4 && h == bh / 4) {
@@ -175,7 +179,16 @@ static long WINAPI hk_CT(void* dev, UINT w, UINT h, UINT lv, DWORD usage, DWORD 
             if (r >= 0) return r;
         }
     }
-    long hr = g_oCT(dev, w, h, lv, usage, fmt, pool, out, sh);
+    /* [Graphics] ShadowFloat32=1: the variance shadow maps store depth and depth^2 as G16R16F; with a long shadow
+       distance their ~11-bit mantissa quantises depth into visible steps on curved surfaces (self-shadowing).
+       G32R32F keeps the same shaders and filtering, at twice the memory and bandwidth. */
+    DWORD cfmt = fmt;
+    if (g_float32 && w >= 1024 && w == h && (usage & 1) && fmt == 0x70) cfmt = 0x73;   /* G32R32F */
+    long hr = g_oCT(dev, w, h, lv, usage, cfmt, pool, out, sh);
+    if (cfmt != fmt) {
+        logf("ShadowFloat32: shadow map %ux%u G16R16F -> G32R32F (hr %08X)", w, h, (DWORD)hr);
+        if (hr < 0) hr = g_oCT(dev, w, h, lv, usage, fmt, pool, out, sh);   /* not supported: keep the game's format */
+    }
     if (hr >= 0 && out && *out && w >= 1024 && w == h && (usage & 1) && fmt == 0x70 /* G16R16F */) {
         void* s = 0; typedef long (WINAPI *GSL_t)(void*, UINT, void**);
         if (((GSL_t)(*(void***)*out)[18])(*out, 0, &s) >= 0 && s) {
@@ -211,14 +224,15 @@ static int ini_bloom(void)
     int b = GetPrivateProfileIntA("Graphics", "BloomScale", 2, g_ini);
     return b < 1 ? 1 : b > 4 ? 4 : b;
 }
+static int ini_float32(void) { return GetPrivateProfileIntA("Graphics", "ShadowFloat32", 0, g_ini) != 0; }
 /* called from diag.c: does this module need the D3D9 device at all? */
-int shadow_wanted(void) { return ini_soft() > 0 || ini_bloom() > 1; }
+int shadow_wanted(void) { return ini_soft() > 0 || ini_bloom() > 1 || ini_float32(); }
 
 void shadow_on_device(void* dev)
 {
     if (g_oCT) return;
-    g_soft = ini_soft(); g_bloomScale = ini_bloom();
-    if (!g_soft && g_bloomScale < 2) { logf("ShadowSoft/Bloom: off (ini)"); return; }
+    g_soft = ini_soft(); g_bloomScale = ini_bloom(); g_float32 = ini_float32();
+    if (!g_soft && g_bloomScale < 2 && !g_float32) { logf("ShadowSoft/Bloom/ShadowFloat32: off (ini)"); return; }
     void** vt = *(void***)dev;
     g_SetPSC = (SetPSC_t)vt[109]; g_SetSS = (SetSS_t)vt[69];
     void* a = detour(vt[23], (void*)hk_CT);

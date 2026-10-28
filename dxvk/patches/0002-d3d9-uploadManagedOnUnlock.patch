@@ -1,0 +1,48 @@
+diff --git a/src/d3d9/d3d9_device.cpp b/src/d3d9/d3d9_device.cpp
+index 9b72bb2..0659798 100644
+--- a/src/d3d9/d3d9_device.cpp
++++ b/src/d3d9/d3d9_device.cpp
+@@ -5227,6 +5227,17 @@ namespace dxvk {
+     MapTexture(pResource, Subresource); // Add it to the list of mapped resources
+     pResource->SetLocked(Subresource, false);
+ 
++    // Upload managed textures now instead of at the first draw that uses them (d3d9.uploadManagedOnUnlock).
++    // The data is still mapped here; at draw time the unmappable copy has usually been unmapped again,
++    // so the upload has to map it once more (a page fault per page) and read it from cold memory.
++    if (unlikely(m_d3d9Options.uploadManagedOnUnlock)
++     && pResource->IsManaged()
++     && pResource->GetMapMode() == D3D9_COMMON_TEXTURE_MAP_MODE_UNMAPPABLE
++     && pResource->NeedsUpload(Subresource)) {
++      this->FlushImage(pResource, Subresource);
++      pResource->SetNeedsUpload(Subresource, false);
++    }
++
+     // Flush image contents from staging if we aren't read only
+     // and we aren't deferring for managed.
+     const D3DBOX& box = pResource->GetDirtyBox(Face);
+diff --git a/src/d3d9/d3d9_options.cpp b/src/d3d9/d3d9_options.cpp
+index cf39326..7f3be03 100644
+--- a/src/d3d9/d3d9_options.cpp
++++ b/src/d3d9/d3d9_options.cpp
+@@ -72,6 +72,7 @@ namespace dxvk {
+     this->seamlessCubes                 = config.getOption<bool>        ("d3d9.seamlessCubes",                 false);
+     this->textureMemory                 = config.getOption<int32_t>     ("d3d9.textureMemory",                 100) << 20;
+     this->skipManagedTextureInit        = config.getOption<bool>        ("d3d9.skipManagedTextureInit",        false);
++    this->uploadManagedOnUnlock         = config.getOption<bool>        ("d3d9.uploadManagedOnUnlock",         false);
+     this->deviceLossOnFocusLoss         = config.getOption<bool>        ("d3d9.deviceLossOnFocusLoss",         false);
+     this->samplerLodBias                = config.getOption<float>       ("d3d9.samplerLodBias",                0.0f);
+     this->clampNegativeLodBias          = config.getOption<bool>        ("d3d9.clampNegativeLodBias",          false);
+diff --git a/src/d3d9/d3d9_options.h b/src/d3d9/d3d9_options.h
+index 835000d..8766945 100644
+--- a/src/d3d9/d3d9_options.h
++++ b/src/d3d9/d3d9_options.h
+@@ -157,6 +157,9 @@ namespace dxvk {
+     /// Only safe for games that write every level before using the texture.
+     bool skipManagedTextureInit;
+ 
++    /// Upload unmappable managed textures when a level is unlocked instead of at the first draw.
++    bool uploadManagedOnUnlock;
++
+     /// Shader dump path
+     std::string shaderDumpPath;
+ 

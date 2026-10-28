@@ -159,10 +159,13 @@ static long WINAPI hk_Create(void* di, const void* g, void** out, void* outer)
         const BYTE* a = (const BYTE*)g; int eq = 1; for (int i = 0; i < 16; i++) if (a[i] != SysKeyboard[i]) eq = 0;
         if (eq) {
             for (int i = 0; i < 4; i++) if (!g_kbd[i]) { g_kbd[i] = *out; break; }
+            /* All DirectInput devices share one vtable, and diag.c hooks the same GetDeviceState/GetDeviceData slots for
+               the mouse. Hook each slot once only: re-hooking a slot that now holds another hook (ours or not) would
+               save that hook as "original" and close a call loop (crash on the second keyboard/mouse device). */
             void** vt = *(void***)*out;
-            if (vt[13] != (void*)hk_SetCoop) { g_origCoop = (SetCoop_t)vt[13]; void* h = (void*)hk_SetCoop; write_mem(&vt[13], &h, 4); }
-            if (g_strafe && vt[9] != (void*)hk_GDS) { g_oGDS = (GDS_t)vt[9]; void* h = (void*)hk_GDS; write_mem(&vt[9], &h, 4); }
-            if (g_strafe && vt[10] != (void*)hk_GDD) { g_oGDD = (GDD_t)vt[10]; void* h = (void*)hk_GDD; write_mem(&vt[10], &h, 4); }
+            if (!g_origCoop) { g_origCoop = (SetCoop_t)vt[13]; void* h = (void*)hk_SetCoop; write_mem(&vt[13], &h, 4); }
+            if (g_strafe && !g_oGDS) { g_oGDS = (GDS_t)vt[9]; void* h = (void*)hk_GDS; write_mem(&vt[9], &h, 4); }
+            if (g_strafe && !g_oGDD) { g_oGDD = (GDD_t)vt[10]; void* h = (void*)hk_GDD; write_mem(&vt[10], &h, 4); }
             logf("Input: keyboard device %08X", (DWORD)*out);
         }
     }
@@ -175,7 +178,7 @@ void input_on_dinput(void* di)
     g_shared = GetPrivateProfileIntA("Window", "KeyboardShared", 1, g_ini);
     if (!di || (!g_shared && !g_strafe)) return;
     void** vt = *(void***)di;
-    if (vt[3] == (void*)hk_Create) return;
+    if (g_origCreate) return;           /* once only: diag.c chains its own CreateDevice hook on top (see hk_Create) */
     g_origCreate = (DICreateDevice_t)vt[3];
     void* h = (void*)hk_Create; write_mem(&vt[3], &h, 4);
     static int started; if (!started && g_shared) { started = 1; HANDLE th = CreateThread(0, 0, layout_thread, 0, 0, 0); if (th) CloseHandle(th); logf("Input: layout hotkey helper active (Alt+Shift, Ctrl+Shift, Win+Space)"); }

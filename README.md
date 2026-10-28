@@ -9,16 +9,43 @@ intro skip and more. Gameplay, balance and saves are not changed.
 
 **Download, full description and installation:** Nexus Mods — *(link)*
 
-This repository contains the source code of **Div2Fix** (`bin/dinput8.dll`), the engine part of the mod.
+This repository contains the source code of **Div2Fix** (`bin/dinput8.dll`), the engine part of the mod,
+and the patches of the modified DXVK build (`bin/d3d9.dll`) shipped since 1.4.
 
 ## For players
 
 **Requirements:** Divinity II: Developer's Cut (Steam), a Vulkan 1.3 GPU,
 and **[Div2Patch](https://github.com/BlanknameES/Div2Patch)** by BlanknameES (install it first).
 
-**Installation:** install Div2Patch → extract `DivinityIIReborn_v1.3.zip` into the game folder (the one with
+**Installation:** install Div2Patch → extract `DivinityIIReborn_v1.4.1.zip` into the game folder (the one with
 `bin` and `Data`) → optionally extract the HD texture pack there too → play.
 Settings: `bin\Div2Fix.ini`. Uninstall: `_Div2Reborn\uninstall.cmd`.
+
+### New in 1.4.1
+
+* **Tree draw distance** — the SpeedTree code reads `TreeQualityMultiplier` (menu maximum 3) only through the getter
+  `0x6A2C20`; Div2Fix makes it return `[Graphics] TreeDistanceMultiplier` (default 6), so trees no longer pop in
+  right in front of the hero and the options menu cannot reset it. Object LOD distance default 3 → 5.
+* **DXVK patch 0003** `d3d9.asyncManagedUpload` — at the first draw of a managed texture its data is packed into the
+  staging buffer on DXVK's CS thread instead of the game's render thread (the render thread only pins the
+  memory-file allocation; `MemoryFilePool` defers a free until the last unmap).
+* **DXVK patch 0004** `d3d9.stagingMemoryPerSubmission` — the 10 MB staging budget of 32-bit DXVK made the game wait
+  for the GPU with 11–22 MB textures; the mod sets 32. With 0003 + 0004 on the same route: frames > 33 ms 7 → 1,
+  worst frame 47.5 → 40.3 ms (one run each).
+* Fixed a crash of the optional profiler (it read code bytes of an unloaded DLL).
+
+### New in 1.4
+
+* **Shorter texture-loading hitches** — DXVK zeroed the CPU copy of every new managed texture before the game
+  overwrote it completely; with 4K textures (11–22 MB each) that cost a memset plus a page fault per page on the
+  render thread. The shipped DXVK has an option to skip it (`d3d9.skipManagedTextureInit`, see `dxvk/`).
+  Same route in game: texture-loading work −48 %, frames > 33 ms 39 → 4, worst frame 89 → 43 ms.
+* **Sharp dragon/character shadow** — `CCharacterShadowMap::Init` hard-codes a 1024² `R32F` map with a hard depth
+  compare; `[Graphics] CharacterShadowSize=4096` removes the large stair steps.
+* Softer, farther cascade transition (`ShadowSplitWeight=0.6`).
+* Fixed a crash: DirectInput hooks of two modules on the shared device vtable could call each other forever when
+  the game re-created a device. Fixed a possible start-up crash on other game builds (intro skip).
+* Optional diagnostics: sampling profiler of long frames, texture statistics, 32-bit address-space log.
 
 ### Highlights
 
@@ -58,7 +85,7 @@ outside the game folder (it reads `Div2Fix.ini`, `Div2Fix_mindread.txt`, `..\lan
 | File | What it does |
 |---|---|
 | `div2fix.c` | DLL entry, `dinput8` export forwarding, settings, logging; key names in hints with non-Latin keyboard layouts; ultrawide (21:9/32:9) menus shown at 16:9 with correct mouse hit-testing |
-| `gfx.c` | object LOD / draw distance multiplier, shadow-map size, shadow distance, cascade split, shadows from all objects |
+| `gfx.c` | object LOD / draw distance multiplier, shadow-map size, shadow distance, cascade split, shadows from all objects, character (dragon) shadow-map size, tree (SpeedTree) draw distance |
 | `shadow.c` | soft shadows: replaces the game's faulty 2nd variance-shadow-map blur pass with a corrected copy of the same shader; larger bloom and light-shaft render targets |
 | `mindread.c` | mind-reading advisor: adds a spoiler-free verdict line to the mind-read confirmation popup (data: `Div2Fix_mindread.txt`) |
 | `icons.c` | draws HD (4x) interface icons at their original on-screen size |
@@ -67,7 +94,9 @@ outside the game folder (it reads `Div2Fix.ini`, `Div2Fix_mindread.txt`, `..\lan
 | `camera.c` | wider mouse-wheel zoom range, zoom step and dragon-form distance (values of Div2Patch, changed in memory) |
 | `window.c` | window icon; keyboard-layout switching in game; strafe left+right cancel |
 | `version.c` | warns once at start-up if the game build is not the one the mod targets |
-| `diag.c` | optional diagnostics: frame-time recorder (F11), D3D9 device hooks used by `shadow.c` |
+| `diag.c` | optional diagnostics: frame-time recorder (F11, or automatic), address-space log, D3D9 device hooks used by `shadow.c` |
+| `texmgr.c` | optional diagnostics: texture creation / lock / upload statistics per frame (`Div2Fix_tex_*`) |
+| `profiler.c` | optional diagnostics: sampling profiler of the render thread in long frames (`Div2Fix_prof_*`) |
 | `detour.c` | minimal x86 function detour used for D3D9 device methods |
 
 ## Build
@@ -77,16 +106,28 @@ outside the game folder (it reads `Div2Fix.ini`, `Div2Fix_mindread.txt`, `..\lan
 
 Output: `div2fix/build/dinput8.dll`. See `CHECKSUMS.txt` for the hashes of the released files.
 
+**DXVK** (`dxvk/`): DXVK v3.1.1 + `dxvk/patches/*.patch`, built with MSYS2 MINGW32 by `dxvk/build_dxvk.sh`
+(instructions at the top of the script). The patches only add options that are off by default:
+
+| Patch | Option | Shipped |
+|---|---|---|
+| `0001-d3d9-skipManagedTextureInit` | do not zero the CPU copy of new managed textures | **on** (`bin/dxvk.conf`) |
+| `0002-d3d9-uploadManagedOnUnlock` | upload managed levels at `UnlockRect` instead of the first draw | off (experimental, worse worst-case frames) |
+| `0003-d3d9-asyncManagedUpload` | pack managed texture data for upload on the CS thread | **on** |
+| `0004-d3d9-stagingMemoryPerSubmission` | staging memory budget per submission (MB) | **32** |
+
 ## Third-party files in the release
 
-* `bin/d3d9.dll` — DXVK 3.1.1 (zlib license), unmodified `x32/d3d9.dll` from the official release.
+* `bin/d3d9.dll` — **altered** DXVK 3.1.1 (zlib license): official source + the patches in `dxvk/patches`.
+  Not the official DXVK release. With `d3d9.skipManagedTextureInit = False` it behaves like official 3.1.1;
+  the official `x32/d3d9.dll` can also be used instead (then remove that line from `dxvk.conf`).
 * `res/div2.ico` — the game's own icon (© Larian Studios), used as the window icon.
 
 ## Credits
 
 * **Larian Studios** — Divinity II and all original assets.
 * **[Div2Patch](https://github.com/BlanknameES/Div2Patch)** by BlanknameES — required, not included.
-* **[DXVK](https://github.com/doitsujin/dxvk)** by Philip Rebohle and contributors — shipped unmodified.
+* **[DXVK](https://github.com/doitsujin/dxvk)** by Philip Rebohle and contributors — shipped with small patches (`dxvk/`).
 * **4x-UltraSharp** by Kim2091 (CC BY-NC-SA 4.0), run with Real-ESRGAN-ncnn-vulkan — used to upscale the textures.
 
 ## License

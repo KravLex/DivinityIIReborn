@@ -31,8 +31,12 @@ void intro_init(Module m)
     BYTE* p = VA(m, 0xB41BB0);
     if (!same(m, 0xB41BB0, "803d") || !same(m, 0xB41BB6, "00744d8b0d") || !same(m, 0xB41BBF, "85c974436a006a0068") ||
         *(DWORD*)(p + 2) != 0x14CEED3 + d || *(DWORD*)(p + 11) != 0x14FAC0C + d || *(DWORD*)(p + 24) != 0x1362CF4 + d) {
-        logf("Intro: patch site mismatch -> startup video unchanged (%02X %02X %02X %02X %02X %02X %02X %02X %02X)",
-             p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8]); return; }
+        /* the site may not even be mapped (other exe): only dump bytes that can be read */
+        if (readable(p, 9))
+            logf("Intro: patch site mismatch -> startup video unchanged (%02X %02X %02X %02X %02X %02X %02X %02X %02X)",
+                 p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7], p[8]);
+        else logf("Intro: patch site not mapped -> startup video unchanged");
+        return; }
     static const BYTE j = 0xEB;
     if (write_mem(VA(m, 0xB41BB7), &j, 1)) logf("Intro: startup video (intro.wmv) skipped");
 }
