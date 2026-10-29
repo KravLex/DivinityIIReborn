@@ -1,13 +1,18 @@
-SHA-256 of the files in DivinityIIReborn_v1.4.1.zip
+SHA-256 of DivinityIIReborn_v1.4.2.zip and the files in it
 
-6c97944d7a77ee9520179eff14d1358cefa5121f986bd8abae8bb15c6c7c785c  bin/dinput8.dll            Div2Fix 1.4.1, built from div2fix/ in this repository
-218e181cd5beeae4643ceaafc7156c2428d79a40173cf0d5bf9eb06df2c13926  bin/d3d9.dll               DXVK 3.1.1 + dxvk/patches (0001-0004), built with dxvk/build_dxvk.sh (MSYS2 MINGW32, GCC 16.2)
-0e9584233c6d6d531b37c9a252d8cdb6338083681678fd53d180154b5d475a5b  bin/dxvk.conf              DXVK settings (text)
-af24e87776f7fcb6b44e4dbeb7e537345a575621bea4fbae3943da380b7c047a  bin/Div2Fix.ini            settings (text)
-ec01d6d55a5278c159b808274fd40cbe9a96505159105960e199a61dd801fb28  bin/Div2Fix_mindread.txt   mind-read advisor table (text)
-6243c6837a2ecd76d2cb24f909cbdea1479bbc8dcffb8e3451799356c949e966  _Div2Reborn/uninstall.cmd  uninstaller (plain batch file, deletes only the mod's own files)
+ecb554e652c6782e541acbb7c64b519a29fe62a99c090b2402b06b28d6f9ebb2  DivinityIIReborn_v1.4.2.zip
 
-Reproducing dinput8.dll: building div2fix/ with LLVM 18 (build.sh or build.cmd) gives a file that is
-byte-identical to the released one except the 4-byte PE TimeDateStamp at file offset 0x80.
+ff32f94f5484c7e2966eedce48705e9abc1eb732bff4a38510097fd3f71d7966  _Div2Reborn/Optional/SkillBalance/FOV_Patch_2.dv2  OPTIONAL skill-balance module (game data archive, changes gameplay; not installed by extracting)
+6243c6837a2ecd76d2cb24f909cbdea1479bbc8dcffb8e3451799356c949e966  _Div2Reborn/uninstall.cmd                          uninstaller (plain batch file, deletes only the mod's own files)
+b1571ee5cb33deb5336c9cf000e364f1853cf5848c1af26ce19a2e2588a5e9f2  bin/d3d9.dll                                       DXVK 3.1.1 + dxvk/patches (0001-0006), built with dxvk/build_dxvk.sh (MSYS2 MINGW32, GCC 16.2)
+ba056efd56312cc06b8f5cbc573ba2f8bb0bca4f792ffdbd3e66051ff707a34e  bin/dinput8.dll                                    Div2Fix 1.4.2, built from div2fix/ in this repository
+9e0900c5f4b12d3f97126716458767239cbc59074f15f2f420130aa438ca1731  bin/Div2Fix.ini                                    settings (text)
+ec01d6d55a5278c159b808274fd40cbe9a96505159105960e199a61dd801fb28  bin/Div2Fix_mindread.txt                           mind-read advisor table (text)
+ebe7cde8ca18be3398558cdcd661e43752026c38eda486a30118ed294ee9adbd  bin/dxvk.conf                                      DXVK settings (text)
+
+All files with hashes: see the release notes / DivinityIIReborn_v1.4.2_SHA256.txt.
+
+Reproducing dinput8.dll: building div2fix/ with LLVM (build.sh or build.cmd) gives a file that is
+byte-identical to the released one except the 4-byte PE TimeDateStamp at file offset 0x80 (same LLVM version).
 d3d9.dll: a GCC/MinGW build is not bit-reproducible across toolchains; compare behaviour, or use the official
 DXVK 3.1.1 x32/d3d9.dll instead (see README).
