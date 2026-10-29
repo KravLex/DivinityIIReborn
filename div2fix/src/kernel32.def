@@ -44,3 +44,7 @@ K32GetModuleInformation@16
 CreateWaitableTimerExW@16
 SetWaitableTimer@24
 WaitForSingleObject@8
+CreateEventA@16
+SetEvent@4
+WaitForMultipleObjects@16
+AddVectoredExceptionHandler@8
