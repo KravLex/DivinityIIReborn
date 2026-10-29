@@ -1,0 +1,260 @@
+diff --git a/src/d3d9/d3d9_device.cpp b/src/d3d9/d3d9_device.cpp
+index ef5a955..cb0002d 100644
+--- a/src/d3d9/d3d9_device.cpp
++++ b/src/d3d9/d3d9_device.cpp
+@@ -23,6 +23,7 @@
+ #include "../util/util_math.h"
+ 
+ #include "d3d9_initializer.h"
++#include "d3d9_parallel_copy.h"
+ 
+ #include <algorithm>
+ #include <cfloat>
+@@ -5384,7 +5385,14 @@ namespace dxvk {
+           D3D9BufferSlice slice = AllocStagingBuffer(dirtySize);
+           VkFormat packedDSFormat = GetPackedDepthStencilFormat(pDestTexture->Desc()->Format);
+ 
++          // d3d9.parallelManagedUploadThreads: a tightly packed level is a single memcpy,
++          // which is bound by page faults on the freshly mapped copy -> split it between threads.
++          D3D9ParallelCopy* parallelCopy = m_d3d9Options.parallelManagedUploadThreads > 1
++            ? D3D9ParallelCopy::get(uint32_t(m_d3d9Options.parallelManagedUploadThreads))
++            : nullptr;
++
+           EmitCs([
++            cParallelCopy   = parallelCopy,
+             cPin            = std::move(pin),
+             cSrcOffset      = VkDeviceSize(pSrcTexture->GetMemoryOffset(SrcSubresource)) + copySrcOffset,
+             cDstPtr         = slice.mapPtr,
+@@ -5399,9 +5407,17 @@ namespace dxvk {
+             cOffset         = alignedDestOffset,
+             cPackedDSFormat = packedDSFormat
+           ] (DxvkContext* ctx) mutable {
+-            util::packImageData(
+-              cDstPtr, reinterpret_cast<const uint8_t*>(cPin.ptr()) + cSrcOffset,
+-              cBlockCount, cElementSize, cPitch, cSlicePitch);
++            const uint8_t* src = reinterpret_cast<const uint8_t*>(cPin.ptr()) + cSrcOffset;
++            const VkDeviceSize bytesPerRow   = cBlockCount.width  * cElementSize;
++            const VkDeviceSize bytesPerLayer = cBlockCount.height * bytesPerRow;
++            const bool directCopy = (bytesPerRow   == cPitch      || cBlockCount.height == 1)
++                                 && (bytesPerLayer == cSlicePitch || cBlockCount.depth  == 1);
++
++            if (cParallelCopy && directCopy)
++              cParallelCopy->copy(cDstPtr, src, size_t(cBlockCount.depth * bytesPerLayer));
++            else
++              util::packImageData(cDstPtr, src, cBlockCount, cElementSize, cPitch, cSlicePitch);
++
+             cPin.release();
+ 
+             ctx->copyBufferToImage(
+diff --git a/src/d3d9/d3d9_options.cpp b/src/d3d9/d3d9_options.cpp
+index d3dd5f8..eedf9d7 100644
+--- a/src/d3d9/d3d9_options.cpp
++++ b/src/d3d9/d3d9_options.cpp
+@@ -75,6 +75,7 @@ namespace dxvk {
+     this->uploadManagedOnUnlock         = config.getOption<bool>        ("d3d9.uploadManagedOnUnlock",         false);
+     this->asyncManagedUpload            = config.getOption<bool>        ("d3d9.asyncManagedUpload",            false);
+     this->stagingMemoryPerSubmission    = config.getOption<int32_t>     ("d3d9.stagingMemoryPerSubmission",    0);
++    this->parallelManagedUploadThreads  = config.getOption<int32_t>     ("d3d9.parallelManagedUploadThreads",  0);
+     this->deviceLossOnFocusLoss         = config.getOption<bool>        ("d3d9.deviceLossOnFocusLoss",         false);
+     this->samplerLodBias                = config.getOption<float>       ("d3d9.samplerLodBias",                0.0f);
+     this->clampNegativeLodBias          = config.getOption<bool>        ("d3d9.clampNegativeLodBias",          false);
+diff --git a/src/d3d9/d3d9_options.h b/src/d3d9/d3d9_options.h
+index a8162a5..580ba50 100644
+--- a/src/d3d9/d3d9_options.h
++++ b/src/d3d9/d3d9_options.h
+@@ -169,6 +169,10 @@ namespace dxvk {
+     /// 0 = DXVK default (10 MB on 32-bit, 30 MB on 64-bit).
+     int32_t stagingMemoryPerSubmission;
+ 
++    /// Threads (including the CS thread) that pack a large managed-texture level
++    /// into the staging buffer for d3d9.asyncManagedUpload. 0 or 1 = CS thread alone.
++    int32_t parallelManagedUploadThreads;
++
+     /// Shader dump path
+     std::string shaderDumpPath;
+ 
+diff --git a/src/d3d9/d3d9_parallel_copy.cpp b/src/d3d9/d3d9_parallel_copy.cpp
+new file mode 100644
+index 0000000..9e0609e
+--- /dev/null
++++ b/src/d3d9/d3d9_parallel_copy.cpp
+@@ -0,0 +1,95 @@
++#include "d3d9_parallel_copy.h"
++
++#include <algorithm>
++#include <cstring>
++
++#include "../util/util_env.h"
++#include "../util/util_string.h"
++#include "../util/log/log.h"
++
++namespace dxvk {
++
++  D3D9ParallelCopy* D3D9ParallelCopy::get(uint32_t threads) {
++    // Intentionally leaked: workers live until the process exits
++    static D3D9ParallelCopy* s_pool = new D3D9ParallelCopy(threads);
++    return s_pool;
++  }
++
++
++  D3D9ParallelCopy::D3D9ParallelCopy(uint32_t threads) {
++    uint32_t workers = std::clamp(threads, 1u, 8u) - 1u;
++    m_jobs.resize(workers);
++
++    for (uint32_t i = 0; i < workers; i++) {
++      dxvk::thread t([this, i] { runWorker(i); });
++      t.detach();
++      m_workers++;
++    }
++
++    Logger::info(str::format("D3D9: parallel managed upload, ", m_workers + 1, " threads per level >= ", MinParallelSize >> 20, " MB"));
++  }
++
++
++  void D3D9ParallelCopy::copy(void* dst, const void* src, size_t size) {
++    if (size < MinParallelSize || !m_workers || !m_busy.try_lock()) {
++      std::memcpy(dst, src, size);
++      return;
++    }
++
++    // Page-aligned parts; the caller copies the last (largest) one
++    const uint32_t parts = m_workers + 1;
++    const size_t part = (size / parts) & ~size_t(4095);
++    auto d = reinterpret_cast<uint8_t*>(dst);
++    auto s = reinterpret_cast<const uint8_t*>(src);
++
++    if (!part) {
++      std::memcpy(dst, src, size);
++      m_busy.unlock();
++      return;
++    }
++
++    size_t offset = 0;
++
++    { std::unique_lock<dxvk::mutex> lock(m_mutex);
++      for (uint32_t i = 0; i < m_workers; i++) {
++        m_jobs[i] = { d + offset, s + offset, part };
++        offset += part;
++      }
++      m_pending = m_workers;
++      m_generation++;
++    }
++
++    m_cond.notify_all();
++    std::memcpy(d + offset, s + offset, size - offset);
++
++    { std::unique_lock<dxvk::mutex> lock(m_mutex);
++      m_doneCond.wait(lock, [this] { return m_pending == 0; });
++    }
++
++    m_busy.unlock();
++  }
++
++
++  void D3D9ParallelCopy::runWorker(uint32_t index) {
++    env::setThreadName("dxvk-d3d9-copy");
++    uint64_t seen = 0;
++
++    while (true) {
++      Job job;
++
++      { std::unique_lock<dxvk::mutex> lock(m_mutex);
++        m_cond.wait(lock, [this, seen] { return m_generation != seen; });
++        seen = m_generation;
++        job = m_jobs[index];
++      }
++
++      std::memcpy(job.dst, job.src, job.size);
++
++      { std::unique_lock<dxvk::mutex> lock(m_mutex);
++        if (!--m_pending)
++          m_doneCond.notify_one();
++      }
++    }
++  }
++
++}
+diff --git a/src/d3d9/d3d9_parallel_copy.h b/src/d3d9/d3d9_parallel_copy.h
+new file mode 100644
+index 0000000..57e81d3
+--- /dev/null
++++ b/src/d3d9/d3d9_parallel_copy.h
+@@ -0,0 +1,66 @@
++#pragma once
++
++#include <cstddef>
++#include <cstdint>
++#include <vector>
++
++#include "../util/thread.h"
++
++namespace dxvk {
++
++  /**
++   * \brief Splits a large memcpy between the calling thread and worker threads
++   *
++   * Used by d3d9.parallelManagedUploadThreads: packing a managed texture from its
++   * unmappable (file-backed) copy into the staging buffer is bound by page faults on
++   * freshly mapped memory, which the kernel handles in parallel. The copy returns only
++   * once every part is done. One pool per process, never destroyed (workers are
++   * daemon threads), so CS commands may use it regardless of device lifetime.
++   */
++  class D3D9ParallelCopy {
++
++  public:
++
++    /// Copies smaller than this are done by the calling thread alone
++    static constexpr size_t MinParallelSize = size_t(1u) << 20;
++
++    /**
++     * \brief Gets the process-wide pool
++     * \param [in] threads Total threads per copy including the caller (first call decides)
++     */
++    static D3D9ParallelCopy* get(uint32_t threads);
++
++    /**
++     * \brief Copies \c size bytes, in parallel if large enough
++     *
++     * Concurrent callers are serialized; a caller that finds the
++     * pool busy copies alone instead of waiting.
++     */
++    void copy(void* dst, const void* src, size_t size);
++
++    uint32_t threadCount() const { return m_workers + 1; }
++
++  private:
++
++    struct Job {
++      uint8_t*        dst  = nullptr;
++      const uint8_t*  src  = nullptr;
++      size_t          size = 0;
++    };
++
++    explicit D3D9ParallelCopy(uint32_t threads);
++
++    void runWorker(uint32_t index);
++
++    uint32_t                  m_workers = 0;
++    dxvk::mutex               m_busy;
++    dxvk::mutex               m_mutex;
++    dxvk::condition_variable  m_cond;
++    dxvk::condition_variable  m_doneCond;
++    std::vector<Job>          m_jobs;
++    uint64_t                  m_generation = 0;
++    uint32_t                  m_pending = 0;
++
++  };
++
++}
+diff --git a/src/d3d9/meson.build b/src/d3d9/meson.build
+index 53d23a6..eeecfb7 100644
+--- a/src/d3d9/meson.build
++++ b/src/d3d9/meson.build
+@@ -39,6 +39,7 @@ d3d9_src = [
+   'd3d9_stateblock.cpp',
+   'd3d9_util.cpp',
+   'd3d9_initializer.cpp',
++  'd3d9_parallel_copy.cpp',
+   'd3d9_fixed_function.cpp',
+   'd3d9_names.cpp',
+   'd3d9_swvp_emu.cpp',
