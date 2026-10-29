@@ -1,0 +1,179 @@
+diff --git a/src/d3d9/d3d9_device.cpp b/src/d3d9/d3d9_device.cpp
+index cb0002d..b14ebd4 100644
+--- a/src/d3d9/d3d9_device.cpp
++++ b/src/d3d9/d3d9_device.cpp
+@@ -81,6 +81,12 @@ namespace dxvk {
+     m_initializer      = new D3D9Initializer(this);
+     m_converter        = new D3D9FormatHelper(m_dxvkDevice);
+ 
++#ifdef DXVK_USE_UNMAPPABLE_MEMORY
++    // d3d9.deferUnmappableRelease: close freed file mappings of managed textures on a background thread
++    if (m_d3d9Options.deferUnmappableRelease)
++      MemoryFilePool::setDeferredRelease(true);
++#endif
++
+     EmitCs([
+       cDevice = m_dxvkDevice
+     ] (DxvkContext* ctx) {
+diff --git a/src/d3d9/d3d9_options.cpp b/src/d3d9/d3d9_options.cpp
+index eedf9d7..a446d58 100644
+--- a/src/d3d9/d3d9_options.cpp
++++ b/src/d3d9/d3d9_options.cpp
+@@ -76,6 +76,7 @@ namespace dxvk {
+     this->asyncManagedUpload            = config.getOption<bool>        ("d3d9.asyncManagedUpload",            false);
+     this->stagingMemoryPerSubmission    = config.getOption<int32_t>     ("d3d9.stagingMemoryPerSubmission",    0);
+     this->parallelManagedUploadThreads  = config.getOption<int32_t>     ("d3d9.parallelManagedUploadThreads",  0);
++    this->deferUnmappableRelease        = config.getOption<bool>        ("d3d9.deferUnmappableRelease",        false);
+     this->deviceLossOnFocusLoss         = config.getOption<bool>        ("d3d9.deviceLossOnFocusLoss",         false);
+     this->samplerLodBias                = config.getOption<float>       ("d3d9.samplerLodBias",                0.0f);
+     this->clampNegativeLodBias          = config.getOption<bool>        ("d3d9.clampNegativeLodBias",          false);
+diff --git a/src/d3d9/d3d9_options.h b/src/d3d9/d3d9_options.h
+index 580ba50..a40d2e9 100644
+--- a/src/d3d9/d3d9_options.h
++++ b/src/d3d9/d3d9_options.h
+@@ -173,6 +173,10 @@ namespace dxvk {
+     /// into the staging buffer for d3d9.asyncManagedUpload. 0 or 1 = CS thread alone.
+     int32_t parallelManagedUploadThreads;
+ 
++    /// Close freed unmappable memory (file mappings of managed textures)
++    /// on a background thread instead of the application thread.
++    bool deferUnmappableRelease;
++
+     /// Shader dump path
+     std::string shaderDumpPath;
+ 
+diff --git a/src/util/util_unmap.cpp b/src/util/util_unmap.cpp
+index b23842c..8a82293 100644
+--- a/src/util/util_unmap.cpp
++++ b/src/util/util_unmap.cpp
+@@ -1,4 +1,5 @@
+ #include "util_unmap.h"
++#include "util_env.h"
+ 
+ #include "./log/log.h"
+ 
+@@ -80,6 +81,78 @@ namespace dxvk {
+ 
+ 
+ 
++  namespace {
++
++    std::atomic<bool> g_deferredRelease = { false };
++
++    /**
++     * \brief Destroys retired memory files on its own thread
++     *
++     * One per process, never destroyed: the thread lives until the
++     * process exits, so pools may retire files at any time.
++     */
++    class MemoryFileReaper {
++
++    public:
++
++      static MemoryFileReaper& get() {
++        static MemoryFileReaper* s_reaper = new MemoryFileReaper();
++        return *s_reaper;
++      }
++
++      void push(MemoryFile&& file) {
++        { std::lock_guard lock(m_mutex);
++          m_files.push_back(std::move(file));
++        }
++
++        m_cond.notify_one();
++      }
++
++    private:
++
++      MemoryFileReaper() {
++        dxvk::thread thread([this] { run(); });
++        thread.detach();
++      }
++
++      void run() {
++        env::setThreadName("dxvk-unmap-free");
++        std::vector<MemoryFile> files;
++
++        while (true) {
++          { std::unique_lock lock(m_mutex);
++            m_cond.wait(lock, [this] { return !m_files.empty(); });
++            files.swap(m_files);
++          }
++
++          // Closes the file mappings outside of the lock
++          files.clear();
++        }
++      }
++
++      dxvk::mutex               m_mutex;
++      dxvk::condition_variable  m_cond;
++      std::vector<MemoryFile>   m_files;
++
++    };
++
++  }
++
++
++  void MemoryFilePool::setDeferredRelease(bool enable) {
++    if (enable && !g_deferredRelease.exchange(true))
++      Logger::info("D3D9: unmappable memory released on a background thread");
++  }
++
++
++  void MemoryFilePool::retire(MemoryFile&& file) {
++    if (g_deferredRelease.load(std::memory_order_relaxed))
++      MemoryFileReaper::get().push(std::move(file));
++    else
++      MemoryFile(std::move(file));
++  }
++
++
+   MemoryFilePool::MemoryFilePool()
+   : m_poolAllocator(m_pageAllocator) {
+ 
+@@ -170,6 +243,7 @@ namespace dxvk {
+         freeChunk(chunkIndex);
+     } else {
+       m_memoryAllocated -= allocInfo.size;
++      retire(std::move(allocInfo.file));
+     }
+ 
+     allocInfo = AllocInfo();
+@@ -289,6 +363,7 @@ namespace dxvk {
+     auto& chunk = m_chunks.at(index);
+     m_memoryAllocated -= chunk.size;
+     m_pageAllocator.removeChunk(index);
++    retire(std::move(chunk.file));
+     chunk = ChunkInfo();
+   }
+ #endif
+diff --git a/src/util/util_unmap.h b/src/util/util_unmap.h
+index af67c0a..48ae2f6 100644
+--- a/src/util/util_unmap.h
++++ b/src/util/util_unmap.h
+@@ -161,6 +161,16 @@ namespace dxvk {
+       return result;
+     }
+ 
++    /**
++     * \brief Closes freed file mappings on a background thread
++     *
++     * Closing a file mapping (when a chunk or a dedicated allocation is freed)
++     * releases its committed memory and can take milliseconds; with this enabled
++     * the application thread only queues the handle (d3d9.deferUnmappableRelease).
++     * \param [in] enable Whether to defer the release
++     */
++    static void setDeferredRelease(bool enable);
++
+   private:
+ 
+     struct PageInfo {
+@@ -204,6 +214,8 @@ namespace dxvk {
+ 
+     void freeLocked(int32_t allocation);
+ 
++    static void retire(MemoryFile&& file);
++
+   };
+ 
+ 
