@@ -87,6 +87,9 @@ __declspec(dllimport) BOOL WINAPI K32GetModuleInformation(HANDLE, HMODULE, MODUL
 __declspec(dllimport) HANDLE WINAPI CreateWaitableTimerExW(void*, const unsigned short*, DWORD, DWORD);
 __declspec(dllimport) BOOL WINAPI SetWaitableTimer(HANDLE, const long long*, long, void*, void*, BOOL);
 __declspec(dllimport) DWORD WINAPI WaitForSingleObject(HANDLE, DWORD);
+__declspec(dllimport) HANDLE WINAPI CreateEventA(void*, BOOL, BOOL, LPCSTR);
+__declspec(dllimport) BOOL WINAPI SetEvent(HANDLE);
+__declspec(dllimport) DWORD WINAPI WaitForMultipleObjects(DWORD, const HANDLE*, BOOL, DWORD);
 #define THREAD_SUSPEND_RESUME 0x0002
 #define THREAD_GET_CONTEXT 0x0008
 #define THREAD_QUERY_INFORMATION 0x0040
