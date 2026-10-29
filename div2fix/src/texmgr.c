@@ -532,6 +532,9 @@ void texmgr_report(const char* txt, const char* csv, const float* dt, int n)
     wsprintfA(b, "  LockRect: %u locks, %s MB; runtime LockRect %s ms, game copy (lock..unlock) %s ms, runtime UnlockRect %s ms\r\n",
               lN, mb1(x1, lKB), ms3(x2, lUs), ms3(x3, cpUs), ms3(x4, ulUs)); wp(&w, b);
 
+    { DWORD pc, sc, pmb; parcopy_stats(&pc, &sc, &pmb);
+      wsprintfA(b, "  ParallelCopy (since game start): %u level copies split between threads (%u MB), %u copies by the game's memcpy_s\r\n", pc, pmb, sc);
+      wp(&w, b); }
     static const char* pools[] = { "DEFAULT", "MANAGED", "SYSTEMMEM", "SCRATCH/other" };
     wp(&w, "\r\n[Created textures by pool]\r\n");
     for (int i = 0; i < 4; i++) { wsprintfA(b, "  %-14s %6u  %10s MB\r\n", pools[i], g_byPool[i].n, mb1(x1, g_byPool[i].kb)); wp(&w, b); }
