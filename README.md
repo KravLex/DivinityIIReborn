@@ -5,7 +5,8 @@
 A visual, engine and quality-of-life overhaul for **Divinity II: Developer's Cut** (Steam, Windows):
 a spoiler-free **mind-reading advisor**, **4x AI-upscaled textures**, HD normal maps and icons, a fix for the
 game's **hard, flickering shadow edges**, 8K shadow maps, smoother bloom and sun rays, correct **ultrawide menus**,
-intro skip and more. Gameplay, balance and saves are not changed.
+intro skip and more. The mod does not change gameplay, balance or saves (an optional, separately installed
+skill-balance module is the only exception, see below).
 
 **Download, full description and installation:** Nexus Mods — *(link)*
 
@@ -17,9 +18,30 @@ and the patches of the modified DXVK build (`bin/d3d9.dll`) shipped since 1.4.
 **Requirements:** Divinity II: Developer's Cut (Steam), a Vulkan 1.3 GPU,
 and **[Div2Patch](https://github.com/BlanknameES/Div2Patch)** by BlanknameES (install it first).
 
-**Installation:** install Div2Patch → extract `DivinityIIReborn_v1.4.1.zip` into the game folder (the one with
+**Installation:** install Div2Patch → extract `DivinityIIReborn_v1.4.2.zip` into the game folder (the one with
 `bin` and `Data`) → optionally extract the HD texture pack there too → play.
 Settings: `bin\Div2Fix.ini`. Uninstall: `_Div2Reborn\uninstall.cmd`.
+
+### New in 1.4.2
+
+* **Parallel texture copy** (`parcopy.c`) — `CopyRendererDataToSurfaceLevel` copies each new texture level with
+  `memcpy_s` (call at `0x5D962D`) into fresh memory-file pages; the copy is page-fault bound. Levels ≥ 1 MB are now
+  split between the game thread and 3 workers (returns after all parts). In game: copy time −33 %, P99.9 44 → 31 ms.
+* **DXVK patch 0005** `d3d9.parallelManagedUploadThreads` — with 0003, the CS thread packs large managed levels into
+  staging with 4 threads. Worst area-entry frames 381 → 199 ms and 257 → 128 ms.
+* **DXVK patch 0006** `d3d9.deferUnmappableRelease` — freed memory-file mappings are closed on a background thread;
+  the 80–118 ms frames when leaving an area are gone.
+* Same route vs 1.4.1: worst frames 336 → 209 ms and 218 → 126 ms, P99.9 44.3 → 29.1 ms (one run each).
+  End-to-end DXVK test (16 DXT1 textures, every read-back pixel compared): 0 wrong pixels in all variants.
+* **Crash fix** (`crashguard.c`, `[General] FSMaterialGuard`) — `0xBA4FC0` reads the `FSMaterial` string extra data
+  at `[edi+0Ch]` without a NULL check (crash `Divinity2.exe+7A4FE8`); the guard returns through the function's own
+  epilogue when the lookup or the `NiStringExtraData` cast fails.
+* **Crash log** (`[General] CrashLog`) — a vectored exception handler writes code, module+offset and return
+  addresses of the first 16 access violations etc. to `Div2Fix.log`; it never changes exception handling.
+* **Optional skill-balance module** (`_Div2Reborn/Optional/SkillBalance`, **changes gameplay**, installed by hand):
+  `FOV_Patch_2.dv2` overrides `rpgstats_skillprototypes.xml` (both episodes) and the Russian `Skills_Localisation.xml`
+  — Summon Mastery, Regenerate, Reflect, Poison Arrows, Blind, Firewall values; Summon/Destruction Mastery
+  descriptions. Details in its `README_RU.txt`. Not part of the main mod.
 
 ### New in 1.4.1
 
@@ -97,6 +119,8 @@ outside the game folder (it reads `Div2Fix.ini`, `Div2Fix_mindread.txt`, `..\lan
 | `diag.c` | optional diagnostics: frame-time recorder (F11, or automatic), address-space log, D3D9 device hooks used by `shadow.c` |
 | `texmgr.c` | optional diagnostics: texture creation / lock / upload statistics per frame (`Div2Fix_tex_*`) |
 | `profiler.c` | optional diagnostics: sampling profiler of the render thread in long frames (`Div2Fix_prof_*`) |
+| `parcopy.c` | parallel copy of large new texture levels (`[Textures] ParallelCopyThreads`) |
+| `crashguard.c` | FSMaterial crash guard, crash log (`[General] FSMaterialGuard`, `CrashLog`) |
 | `detour.c` | minimal x86 function detour used for D3D9 device methods |
 
 ## Build
@@ -115,12 +139,14 @@ Output: `div2fix/build/dinput8.dll`. See `CHECKSUMS.txt` for the hashes of the r
 | `0002-d3d9-uploadManagedOnUnlock` | upload managed levels at `UnlockRect` instead of the first draw | off (experimental, worse worst-case frames) |
 | `0003-d3d9-asyncManagedUpload` | pack managed texture data for upload on the CS thread | **on** |
 | `0004-d3d9-stagingMemoryPerSubmission` | staging memory budget per submission (MB) | **32** |
+| `0005-d3d9-parallelManagedUpload` | pack large managed levels with worker threads (with 0003) | **4** |
+| `0006-d3d9-deferUnmappableRelease` | close freed memory-file mappings on a background thread | **on** |
 
 ## Third-party files in the release
 
 * `bin/d3d9.dll` — **altered** DXVK 3.1.1 (zlib license): official source + the patches in `dxvk/patches`.
-  Not the official DXVK release. With `d3d9.skipManagedTextureInit = False` it behaves like official 3.1.1;
-  the official `x32/d3d9.dll` can also be used instead (then remove that line from `dxvk.conf`).
+  Not the official DXVK release. With all the options above off it behaves like official 3.1.1;
+  the official `x32/d3d9.dll` can also be used instead (then remove those lines from `dxvk.conf`).
 * `res/div2.ico` — the game's own icon (© Larian Studios), used as the window icon.
 
 ## Credits
