@@ -15,6 +15,14 @@ void* __cdecl memset(void* d, int c, SIZE_T n);
 /* diagnostics module */
 void diag_init(Module m);
 void gfx_init(Module m);
+/* parallel texture-level copy (parcopy.c) */
+void parcopy_init(Module m);
+void crashguard_init(Module m);
+void crashguard_exit(void);
+int parcopy_pool(int threads);
+void parcopy_run(void* dst, const void* src, DWORD n, int workers);
+int __cdecl parcopy_memcpy_s(void* dst, SIZE_T dstSize, const void* src, SIZE_T count);
+void parcopy_stats(DWORD* parCalls, DWORD* serCalls, DWORD* parMB);
 void mindread_init(Module m);
 void camera_init(Module m);
 void icons_init(Module m);
