@@ -23,6 +23,13 @@ and **[Div2Patch](https://github.com/BlanknameES/Div2Patch)** by BlanknameES (in
 `bin` and `Data`) → optionally extract the HD texture pack there too → play.
 Settings: `bin\Div2Fix.ini`, `bin\dxvk.conf`. Uninstall: `_Div2Reborn\uninstall.cmd`.
 
+**Graphics tip — DSR:** for the cleanest picture enable **DSR / DLDSR** in the NVIDIA driver (**VSR** on AMD) and
+pick a resolution above your native one in the game, e.g. DLDSR 2.25x (5160x2160 for a 3440x1440 screen). The game
+renders at the higher resolution and is scaled down to the screen: grass, foliage and the HD textures get cleaner,
+and with the mod's anti-aliasing edges are almost perfectly smooth. The cost is FPS (2.25 times the pixels). The mod
+was tested at 5160x2160 via DLDSR. NVIDIA Control Panel → Manage 3D settings → DSR - Factors (tick the DL factors),
+then choose the new resolution in the game's options.
+
 ### New in 1.5
 
 * **SMAA + TAA before the interface** (DXVK patches 0011, 0012) — right after the engine's tonemap draw
@@ -30,7 +37,8 @@ Settings: `bin\Div2Fix.ini`, `bin\dxvk.conf`. Uninstall: `_Div2Reborn\uninstall.
   engine's packed depth + normal G-buffer) and TAA: sub-pixel jitter of the projection, reprojection with the
   engine's depth and the camera read from the light pre-pass constants, rejection of disoccluded pixels. The
   interface is drawn afterwards and stays sharp. F11 cycles SMAA + TAA / TAA / SMAA / off. 0.8 ms GPU per frame at
-  3440x1440 (RTX 3080 Ti).
+  3440x1440 (RTX 3080 Ti). It helps most **in motion**: without it grass, foliage and edges shimmer and crawl as the
+  camera turns or the hero walks; with it they stay calm. On a still screenshot the difference is much smaller.
 * **Shadow cascade seam fixed, shadows twice as far** (DXVK patch 0010 + `shaders/far`) — DXVK replaces two pixel
   shaders of the sun light pre-pass (by the SHA-1 of their original bytecode) with recompiled ones: the engine's own
   VSM test, but blended between cascades over the last 15 % of each cascade (the hard seam used to move with the
