@@ -1,0 +1,68 @@
+diff --git a/src/d3d9/d3d9_window.cpp b/src/d3d9/d3d9_window.cpp
+index 543da09..55b80b7 100644
+--- a/src/d3d9/d3d9_window.cpp
++++ b/src/d3d9/d3d9_window.cpp
+@@ -54,7 +54,20 @@ namespace dxvk
+         DefWindowProcW, DefWindowProcA, unicode,
+           window, message, wparam, lparam);
+ 
+-    
++    // Reborn: the swapchain is gone but a subclass installed on top of ours still calls us (see ResetWindowProc):
++    // only pass the message on to the window's own procedure.
++    if (!windowData.swapchain) {
++      LRESULT result = CallCharsetFunction(
++        CallWindowProcW, CallWindowProcA, unicode,
++          windowData.proc, window, message, wparam, lparam);
++
++      if (message == WM_NCDESTROY) {
++        std::lock_guard lock(g_windowProcMapMutex);
++        g_windowProcMap.erase(window);
++      }
++      return result;
++    }
++
+     D3D9DeviceEx* device = windowData.swapchain->GetParent();
+ 
+     if (message == WM_DESTROY)
+@@ -115,10 +128,19 @@ namespace dxvk
+         window, GWLP_WNDPROC));
+ 
+ 
+-    if (proc == D3D9WindowProc)
+-      CallCharsetFunction(
+-        SetWindowLongPtrW, SetWindowLongPtrA, it->second.unicode,
+-          window, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(it->second.proc));
++    if (proc != D3D9WindowProc) {
++      // Reborn: someone subclassed the window after us (opengl32.dll of the NVIDIA Vulkan driver does) and keeps
++      // calling D3D9WindowProc as its original. Forgetting the window's own procedure here sent its messages to
++      // DefWindowProc, and the next HookWindowProc stored that subclass as the original: D3D9WindowProc -> subclass
++      // -> D3D9WindowProc -> ... until the stack overflowed (Divinity II, loading a save). Stay in the chain and
++      // only forward until a swapchain takes the window again.
++      it->second.swapchain = nullptr;
++      return;
++    }
++
++    CallCharsetFunction(
++      SetWindowLongPtrW, SetWindowLongPtrA, it->second.unicode,
++        window, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(it->second.proc));
+ 
+     g_windowProcMap.erase(window);
+   }
+@@ -129,6 +151,17 @@ namespace dxvk
+ 
+     ResetWindowProc(window);
+ 
++    auto it = g_windowProcMap.find(window);
++    if (it != g_windowProcMap.end()) {
++      // Reborn: still in the chain under a foreign subclass (see ResetWindowProc), keep the window's own procedure
++      Logger::info(str::format("D3D9: window ", window, " was subclassed after DXVK, keeping its window procedure"));
++      it->second.filter = false;
++      it->second.activateProcessed = false;
++      it->second.deactivateProcessed = false;
++      it->second.swapchain = swapchain;
++      return;
++    }
++
+     D3D9WindowData windowData;
+     windowData.unicode = IsWindowUnicode(window);
+     windowData.filter  = false;

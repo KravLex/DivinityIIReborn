@@ -18,6 +18,7 @@ typedef int (__stdcall *FARPROC)(void);
 typedef struct { void* BaseAddress; void* AllocationBase; DWORD AllocationProtect; SIZE_T RegionSize; DWORD State; DWORD Protect; DWORD Type; } MEMORY_BASIC_INFORMATION;
 #define MEM_COMMIT 0x1000
 #define MEM_FREE 0x10000
+#define MEM_IMAGE 0x1000000
 #define PAGE_NOACCESS 0x01
 #define PAGE_GUARD 0x100
 __declspec(dllimport) HMODULE WINAPI GetModuleHandleA(LPCSTR);

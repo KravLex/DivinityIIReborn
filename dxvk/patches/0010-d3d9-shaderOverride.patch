@@ -1,0 +1,296 @@
+diff --git a/src/d3d9/d3d9_device.cpp b/src/d3d9/d3d9_device.cpp
+index 829e196..d447b6c 100644
+--- a/src/d3d9/d3d9_device.cpp
++++ b/src/d3d9/d3d9_device.cpp
+@@ -78,6 +78,9 @@ namespace dxvk {
+     if (m_d3d9Options.frameCensus)
+       m_census = std::make_unique<D3D9FrameCensus>(m_d3d9Options);
+ 
++    if (!m_d3d9Options.shaderOverridePath.empty())
++      m_shaderOverride = std::make_unique<D3D9ShaderOverride>(m_d3d9Options);
++
+     if (m_dxvkDevice->debugFlags().test(DxvkDebugFlag::Markers))
+       m_annotation = new D3D9UserDefinedAnnotation(this);
+ 
+@@ -3561,18 +3564,31 @@ namespace dxvk {
+     D3D9CommonShader module;
+     size_t bytecodeLength;
+ 
++    // Divinity II Reborn: optional replacement by SHA-1 of the original bytecode
++    const DWORD* function = pFunction;
++    size_t originalLength = 0;
++
++    if (unlikely(m_shaderOverride != nullptr && pFunction != nullptr))
++      function = m_shaderOverride->Apply(pFunction, CanSWVP(), &originalLength);
++
+     if (FAILED(this->CreateShaderModule(&module,
+       &bytecodeLength,
+       D3D9ShaderType::VertexShader,
+-      pFunction)))
++      function)))
+       return D3DERR_INVALIDCALL;
+ 
++    // The application keeps seeing its own bytecode (GetFunction): D3DX effects read the
++    // constant table of the created shader to decide which registers and samplers to set
++    if (function != pFunction)
++      bytecodeLength = originalLength;
++
+     auto* shader = new D3D9VertexShader(this,
+       &m_shaderAllocator,
+       module,
+       pFunction,
+       uint32_t(bytecodeLength));
+ 
++    // The census names shaders by their original bytecode
+     if (unlikely(m_census != nullptr))
+       shader->SetCensusId(m_census->NameShader(pFunction, bytecodeLength, false));
+ 
+@@ -3924,18 +3940,31 @@ namespace dxvk {
+     D3D9CommonShader module;
+     size_t bytecodeLength;
+ 
++    // Divinity II Reborn: optional replacement by SHA-1 of the original bytecode
++    const DWORD* function = pFunction;
++    size_t originalLength = 0;
++
++    if (unlikely(m_shaderOverride != nullptr && pFunction != nullptr))
++      function = m_shaderOverride->Apply(pFunction, CanSWVP(), &originalLength);
++
+     if (FAILED(this->CreateShaderModule(&module,
+       &bytecodeLength,
+       D3D9ShaderType::PixelShader,
+-      pFunction)))
++      function)))
+       return D3DERR_INVALIDCALL;
+ 
++    // The application keeps seeing its own bytecode (GetFunction): D3DX effects read the
++    // constant table of the created shader to decide which registers and samplers to set
++    if (function != pFunction)
++      bytecodeLength = originalLength;
++
+     auto* shader = new D3D9PixelShader(this,
+       &m_shaderAllocator,
+       module,
+       pFunction,
+       uint32_t(bytecodeLength));
+ 
++    // The census names shaders by their original bytecode
+     if (unlikely(m_census != nullptr))
+       shader->SetCensusId(m_census->NameShader(pFunction, bytecodeLength, true));
+ 
+diff --git a/src/d3d9/d3d9_device.h b/src/d3d9/d3d9_device.h
+index dbc8088..4578cf5 100644
+--- a/src/d3d9/d3d9_device.h
++++ b/src/d3d9/d3d9_device.h
+@@ -22,6 +22,7 @@
+ #include "d3d9_interop.h"
+ #include "d3d9_on_12.h"
+ #include "d3d9_frame_census.h"
++#include "d3d9_shader_override.h"
+ 
+ #include <cstdint>
+ #include <memory>
+@@ -1651,6 +1652,7 @@ namespace dxvk {
+     bool                            m_validSampleMask  = false;
+ 
+     std::unique_ptr<D3D9FrameCensus> m_census;
++    std::unique_ptr<D3D9ShaderOverride> m_shaderOverride;
+ 
+     VkImageLayout                   m_hazardLayout = VK_IMAGE_LAYOUT_GENERAL;
+ 
+diff --git a/src/d3d9/d3d9_options.cpp b/src/d3d9/d3d9_options.cpp
+index a336faa..d88ed60 100644
+--- a/src/d3d9/d3d9_options.cpp
++++ b/src/d3d9/d3d9_options.cpp
+@@ -86,6 +86,8 @@ namespace dxvk {
+     // String options parse an unset value as empty, so the default is applied here
+     if (this->frameCensusShaderNames.empty())
+       this->frameCensusShaderNames = "Div2Reborn_shaders.txt";
++
++    this->shaderOverridePath            = config.getOption<std::string> ("d3d9.shaderOverridePath",            "");
+     this->deviceLossOnFocusLoss         = config.getOption<bool>        ("d3d9.deviceLossOnFocusLoss",         false);
+     this->samplerLodBias                = config.getOption<float>       ("d3d9.samplerLodBias",                0.0f);
+     this->clampNegativeLodBias          = config.getOption<bool>        ("d3d9.clampNegativeLodBias",          false);
+diff --git a/src/d3d9/d3d9_options.h b/src/d3d9/d3d9_options.h
+index 763d962..5e40473 100644
+--- a/src/d3d9/d3d9_options.h
++++ b/src/d3d9/d3d9_options.h
+@@ -193,6 +193,10 @@ namespace dxvk {
+     /// Shader name table (sha1 stage effect technique pass), relative to the exe
+     std::string frameCensusShaderNames;
+ 
++    /// Divinity II Reborn shader override: folder (relative to the exe) with
++    /// <sha1 of original bytecode>.dxso replacements. Empty = off.
++    std::string shaderOverridePath;
++
+     /// Shader dump path
+     std::string shaderDumpPath;
+ 
+diff --git a/src/d3d9/d3d9_shader_override.cpp b/src/d3d9/d3d9_shader_override.cpp
+new file mode 100644
+index 0000000..cf08b8a
+--- /dev/null
++++ b/src/d3d9/d3d9_shader_override.cpp
+@@ -0,0 +1,87 @@
++#include "d3d9_shader_override.h"
++
++#include <unordered_set>   // d3d9_constant_copy.h (via the analysis header) relies on it
++
++#include "d3d9_options.h"
++#include "d3d9_shader_analysis.h"
++
++#include "../util/log/log.h"
++#include "../util/sha1/sha1_util.h"
++#include "../util/util_env.h"
++#include "../util/util_string.h"
++
++#include <cstring>
++#include <fstream>
++#include <iterator>
++#include <limits>
++
++namespace dxvk {
++
++  D3D9ShaderOverride::D3D9ShaderOverride(const D3D9Options& Options) {
++    std::string dir = Options.shaderOverridePath;
++    bool absolute = dir.size() > 1 && (dir[1] == ':' || dir[0] == '\\' || dir[0] == '/');
++
++    if (!absolute) {
++      std::string exe = env::getExePath();
++      auto n = exe.find_last_of("\\/");
++      dir = (n != std::string::npos ? exe.substr(0, n + 1) : std::string()) + dir;
++    }
++
++    if (!dir.empty() && dir.back() != '\\' && dir.back() != '/')
++      dir += '\\';
++
++    m_dir = dir;
++    Logger::info(str::format("D3D9 shader override: replacements from ", m_dir));
++  }
++
++
++  size_t D3D9ShaderOverride::BytecodeLength(const DWORD* pFunction, size_t MaxBytes, bool CanSWVP) {
++    // Same pre-pass as D3D9DeviceEx::CreateShaderModule, so the length (and the
++    // validity check) is exactly what DXVK would use for this bytecode
++    dxbc_spv::util::ByteReader reader(pFunction, MaxBytes);
++    D3D9ShaderAnalysis analysis(reader, CanSWVP);
++    return analysis ? analysis.GetLength() : 0u;
++  }
++
++
++  const DWORD* D3D9ShaderOverride::Apply(const DWORD* pFunction, bool CanSWVP, size_t* pOriginalLength) {
++    size_t length = BytecodeLength(pFunction, std::numeric_limits<size_t>::max(), CanSWVP);
++    *pOriginalLength = length;
++
++    if (!length)
++      return pFunction;
++
++    std::string sha1 = Sha1Hash::compute(pFunction, length).toString();
++    auto entry = m_cache.find(sha1);
++
++    if (entry == m_cache.end()) {
++      std::vector<DWORD> code;
++      std::string path = m_dir + sha1 + ".dxso";
++      std::ifstream file(str::topath(path.c_str()).c_str(), std::ios_base::binary);
++
++      if (file) {
++        std::vector<char> bytes((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
++        code.resize((bytes.size() + 3u) / 4u + 1u, 0u);
++        std::memcpy(code.data(), bytes.data(), bytes.size());
++
++        bool sameType = bytes.size() >= 8u && (code[0] & 0xFFFFFF00u) == (pFunction[0] & 0xFFFFFF00u);
++        size_t newLength = sameType ? BytecodeLength(code.data(), bytes.size(), CanSWVP) : 0u;
++
++        if (!sameType || !newLength || newLength > bytes.size()) {
++          Logger::err(str::format("D3D9 shader override: ", path, " rejected (",
++            !sameType ? "different shader type or version" : "invalid bytecode", "), original shader kept"));
++          code.clear();
++        } else {
++          m_applied += 1u;
++          Logger::info(str::format("D3D9 shader override: ", sha1, " replaced (", length, " -> ", newLength,
++            " bytes, ", m_applied, " so far)"));
++        }
++      }
++
++      entry = m_cache.emplace(sha1, std::move(code)).first;
++    }
++
++    return entry->second.empty() ? pFunction : entry->second.data();
++  }
++
++}
+diff --git a/src/d3d9/d3d9_shader_override.h b/src/d3d9/d3d9_shader_override.h
+new file mode 100644
+index 0000000..d162545
+--- /dev/null
++++ b/src/d3d9/d3d9_shader_override.h
+@@ -0,0 +1,57 @@
++#pragma once
++
++#include <cstdint>
++#include <string>
++#include <unordered_map>
++#include <vector>
++
++#include "d3d9_include.h"
++
++namespace dxvk {
++
++  struct D3D9Options;
++
++  /**
++   * \brief Divinity II Reborn shader override
++   *
++   * Replaces the bytecode an application passes to Create{Vertex,Pixel}Shader
++   * with <dir>\<sha1>.dxso, where sha1 is the SHA-1 of the original bytecode
++   * (version token through END token, as listed by tools/re/fx_effects.py).
++   * The replacement must be the same shader type and major version and is
++   * expected to read the same constant registers and samplers as the original,
++   * since the application keeps setting those (tools/shaders checks this).
++   * Shaders without a file are created unchanged.
++   */
++  class D3D9ShaderOverride {
++
++  public:
++
++    D3D9ShaderOverride(const D3D9Options& Options);
++
++    /**
++     * \brief Bytecode to create instead of \c pFunction
++     *
++     * \param [out] pOriginalLength Length of the original bytecode (0 if invalid)
++     * \returns Replacement bytecode, or \c pFunction itself if there is none
++     */
++    const DWORD* Apply(const DWORD* pFunction, bool CanSWVP, size_t* pOriginalLength);
++
++    /**
++     * \brief Length in bytes of D3D9 shader bytecode, as DXVK's analysis pre-pass sees it
++     * \returns 0 if the bytecode is invalid
++     */
++    static size_t BytecodeLength(const DWORD* pFunction, size_t MaxBytes, bool CanSWVP);
++
++  private:
++
++    std::string m_dir;
++
++    // Replacements stay alive for the lifetime of the device; an empty vector
++    // records a hash that has no (valid) replacement so the file is not looked up again
++    std::unordered_map<std::string, std::vector<DWORD>> m_cache;
++
++    uint32_t m_applied = 0u;
++
++  };
++
++}
+diff --git a/src/d3d9/meson.build b/src/d3d9/meson.build
+index f388f0e..d40d0d9 100644
+--- a/src/d3d9/meson.build
++++ b/src/d3d9/meson.build
+@@ -41,6 +41,7 @@ d3d9_src = [
+   'd3d9_initializer.cpp',
+   'd3d9_parallel_copy.cpp',
+   'd3d9_frame_census.cpp',
++  'd3d9_shader_override.cpp',
+   'd3d9_fixed_function.cpp',
+   'd3d9_names.cpp',
+   'd3d9_swvp_emu.cpp',

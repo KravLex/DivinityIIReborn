@@ -1,0 +1,1366 @@
+diff --git a/src/d3d9/d3d9_device.cpp b/src/d3d9/d3d9_device.cpp
+index af33ff7..67de2dd 100644
+--- a/src/d3d9/d3d9_device.cpp
++++ b/src/d3d9/d3d9_device.cpp
+@@ -3074,7 +3074,8 @@ namespace dxvk {
+     if (unlikely(m_census != nullptr && m_census->IsCapturing()))
+       m_census->OnDraw(m_state, "DP", PrimitiveCount);
+ 
+-    ArmPostAA();
++    ArmPostAA(INT(StartVertex), GetVertexCount(PrimitiveType, PrimitiveCount));
++    PostFrameNoiseGuard postFrameNoise = { this };
+ 
+     bool dynamicSysmemVBOs = false;
+ 
+@@ -3133,7 +3134,8 @@ namespace dxvk {
+     if (unlikely(m_census != nullptr && m_census->IsCapturing()))
+       m_census->OnDraw(m_state, "DIP", PrimitiveCount);
+ 
+-    ArmPostAA();
++    ArmPostAA(BaseVertexIndex + INT(MinVertexIndex), NumVertices);
++    PostFrameNoiseGuard postFrameNoise = { this };
+ 
+     bool dynamicSysmemVBOs = false;
+     bool dynamicSysmemIBO = false;
+@@ -3204,7 +3206,8 @@ namespace dxvk {
+     if (unlikely(m_census != nullptr && m_census->IsCapturing()))
+       m_census->OnDraw(m_state, "DPUP", PrimitiveCount);
+ 
+-    ArmPostAA();
++    ArmPostAA(0, 0);
++    PostFrameNoiseGuard postFrameNoise = { this };
+ 
+     PrepareDraw(PrimitiveType, false, false);
+ 
+@@ -3265,7 +3268,8 @@ namespace dxvk {
+     if (unlikely(m_census != nullptr && m_census->IsCapturing()))
+       m_census->OnDraw(m_state, "DIPUP", PrimitiveCount);
+ 
+-    ArmPostAA();
++    ArmPostAA(0, 0);
++    PostFrameNoiseGuard postFrameNoise = { this };
+ 
+     PrepareDraw(PrimitiveType, false, false);
+ 
+@@ -4004,7 +4008,7 @@ namespace dxvk {
+     // Divinity II Reborn post AA runs after draws with this shader (by its original bytecode)
+     if (unlikely(m_postAA != nullptr)) {
+       shader->SetPostTrigger(m_postAA->IsTrigger(pFunction, bytecodeLength));
+-      shader->SetPostGBufferReader(m_postAA->IsGBufferReader(pFunction, bytecodeLength));
++      shader->SetPostGBufferReader(m_postAA->GBufferReader(pFunction, bytecodeLength));
+     }
+ 
+     *ppShader = ref(shader);
+@@ -7023,6 +7027,94 @@ namespace dxvk {
+   }
+ 
+ 
++  void D3D9DeviceEx::UpdatePostJitter() {
++    // Depth-tested draws into the scene-sized targets before the tonemap pass (scene geometry,
++    // G-buffer, light pre-pass); never shadow maps, post-processing of other sizes or the interface
++    float jitter[2] = { 0.0f, 0.0f };
++    const D3D9Surface* rt = m_state.renderTargets[0].ptr();
++    bool trigger = m_state.pixelShader != nullptr && m_state.pixelShader->IsPostTrigger();
++
++    if (rt != nullptr && m_state.depthStencil != nullptr && !trigger
++     && m_state.renderStates[D3DRS_ZENABLE] != D3DZB_FALSE) {
++      VkExtent2D extent = rt->GetSurfaceExtent();
++      m_postAA->Jitter(extent.width, extent.height, jitter);
++    }
++
++    if (jitter[0] != m_postJitter[0] || jitter[1] != m_postJitter[1]) {
++      m_postJitter[0] = jitter[0];
++      m_postJitter[1] = jitter[1];
++      m_dirty.set(D3D9DeviceDirtyFlag::ViewportScissor);
++    }
++  }
++
++
++  void D3D9DeviceEx::CapturePostCamera(uint32_t ViewMatRegister, INT FirstVertex, UINT NumVertices) {
++    // The light pre-pass vertex shader (div2_PreLightPass, b810027e...): POSITION (clip = dp4 with c0..c3),
++    // ray = (t2.y, t3.x, t3.y) - (t1.x, t1.y, t2.x) from TEXCOORD1..3
++    const D3DVERTEXELEMENT9* elements[4] = { };
++
++    for (const auto& e : m_state.vertexDecl->GetElements()) {
++      if (e.Usage == D3DDECLUSAGE_POSITION && e.UsageIndex == 0)
++        elements[0] = &e;
++      else if (e.Usage == D3DDECLUSAGE_TEXCOORD && e.UsageIndex >= 1 && e.UsageIndex <= 3)
++        elements[e.UsageIndex] = &e;
++    }
++
++    for (uint32_t i = 0; i < 4; i++) {
++      if (!elements[i] || elements[i]->Type > D3DDECLTYPE_FLOAT4 || elements[i]->Stream >= caps::MaxStreams) {
++        m_postAA->CameraUnavailable("unexpected vertex declaration");
++        return;
++      }
++    }
++
++    if (FirstVertex < 0 || NumVertices > 8u) {
++      m_postAA->CameraUnavailable("the draw is not a full-screen quad");
++      return;
++    }
++
++    if (ViewMatRegister + 11u >= caps::MaxSM3FloatConstantsPS) {
++      m_postAA->CameraUnavailable("view matrix register out of range");
++      return;
++    }
++
++    D3D9PostCameraVertex vertices[8];
++
++    for (UINT v = 0; v < NumVertices; v++) {
++      float data[4][4];
++
++      for (uint32_t i = 0; i < 4; i++) {
++        const D3DVERTEXELEMENT9& e = *elements[i];
++        const D3D9VBO& vbo = m_state.vertexBuffers[e.Stream];
++        D3D9CommonBuffer* buffer = GetCommonBuffer(vbo.vertexBuffer);
++        const uint8_t* base = buffer != nullptr && buffer->GetMappedSlice() != nullptr
++          ? reinterpret_cast<const uint8_t*>(buffer->GetMappedSlice()->mapPtr()) : nullptr;
++        uint32_t components = uint32_t(e.Type) + 1u;
++        size_t offset = size_t(vbo.offset) + size_t(UINT(FirstVertex) + v) * vbo.stride + e.Offset;
++
++        if (base == nullptr || offset + components * sizeof(float) > buffer->Desc()->Size) {
++          m_postAA->CameraUnavailable("the vertex data cannot be read");
++          return;
++        }
++
++        data[i][0] = data[i][1] = data[i][2] = 0.0f;
++        data[i][3] = 1.0f;
++        std::memcpy(data[i], base + offset, components * sizeof(float));
++      }
++
++      D3D9PostCameraVertex& out = vertices[v];
++      out.pos[0] = data[0][0]; out.pos[1] = data[0][1]; out.pos[2] = data[0][2];
++      out.a[0] = data[1][0];   out.a[1] = data[1][1];   out.a[2] = data[2][0];
++      out.b[0] = data[2][1];   out.b[1] = data[3][0];   out.b[2] = data[3][1];
++    }
++
++    const float* viewMat = m_state.psConsts->fConsts[ViewMatRegister].data;
++    const float* eyeHint = m_state.psConsts->fConsts[ViewMatRegister + 4u].data;
++    const float* shadowHint = m_state.psConsts->fConsts[ViewMatRegister + 10u].data;   // two registers
++    const float* worldViewProj = m_state.vsConsts->fConsts[0].data;
++    m_postAA->NoteCamera(viewMat, eyeHint, shadowHint, worldViewProj, vertices, NumVertices);
++  }
++
++
+   void D3D9DeviceEx::BindViewportAndScissor() {
+     m_dirty.clr(D3D9DeviceDirtyFlag::ViewportScissor);
+ 
+@@ -7046,7 +7138,7 @@ namespace dxvk {
+ 
+     DxvkViewport state = { };
+     state.viewport = VkViewport{
+-      float(vp.X)     + cf,    float(vp.Height + vp.Y) + cf,
++      float(vp.X)     + cf + m_postJitter[0],    float(vp.Height + vp.Y) + cf + m_postJitter[1],
+       float(vp.Width),        -float(vp.Height),
+       std::clamp(vp.MinZ,                            0.0f, 1.0f),
+       std::clamp(std::max(vp.MaxZ, vp.MinZ + zBias), 0.0f, 1.0f),
+diff --git a/src/d3d9/d3d9_device.h b/src/d3d9/d3d9_device.h
+index f19fdb5..e450da5 100644
+--- a/src/d3d9/d3d9_device.h
++++ b/src/d3d9/d3d9_device.h
+@@ -1491,12 +1491,15 @@ namespace dxvk {
+     void OnCensusPresent() {
+       RunPendingPostAA();
+ 
++      if (unlikely(m_postAA != nullptr))
++        m_postAA->OnPresent();
++
+       if (unlikely(m_census != nullptr))
+         m_census->OnPresent();
+     }
+ 
+     /**
+-     * rief Runs Divinity II Reborn post AA if a tonemap draw armed it
++     * \brief Runs Divinity II Reborn post AA if a tonemap draw armed it
+      *
+      * Called before the next draw, clear, copy or present.
+      * Has to be externally synchronized.
+@@ -1507,14 +1510,34 @@ namespace dxvk {
+     }
+ 
+     /**
+-     * rief Arms Divinity II Reborn post AA when the current pixel shader is the trigger
++     * \brief Arms Divinity II Reborn post AA when the current pixel shader is the trigger
++     *
++     * Also notes the depth + normal buffer and the camera (light pre-pass draws: \p FirstVertex and
++     * \p NumVertices of the vertex buffer draw, 0 vertices for draws from user memory) and sets the TAA
++     * jitter of this draw. Called before PrepareDraw.
+      */
+-    void ArmPostAA() {
+-      if (likely(m_postAA == nullptr || m_state.pixelShader == nullptr))
++    void ArmPostAA(INT FirstVertex, UINT NumVertices) {
++      if (likely(m_postAA == nullptr))
++        return;
++
++      UpdatePostJitter();
++
++      if (m_state.pixelShader == nullptr)
+         return;
+ 
+-      if (m_state.pixelShader->IsPostGBufferReader())
++      if (m_state.pixelShader->IsPostGBufferReader()) {
+         m_postAA->NoteGBuffer(m_state.textures[0]);
++        SetPostFrameNoise(m_postAA->FrameNoise(), m_postAA->ShadowDebug());
++
++        int32_t viewMat = m_state.pixelShader->GetPostViewMatRegister();
++
++        if (viewMat >= 0 && m_postAA->WantsCamera()) {
++          if (NumVertices)
++            CapturePostCamera(uint32_t(viewMat), FirstVertex, NumVertices);
++          else
++            m_postAA->CameraUnavailable("the draw uses vertices from user memory");
++        }
++      }
+ 
+       if (m_state.pixelShader->IsPostTrigger())
+         m_postAA->Arm(m_state.renderTargets[0].ptr());
+@@ -1682,6 +1705,51 @@ namespace dxvk {
+     std::unique_ptr<D3D9FrameCensus> m_census;
+     std::unique_ptr<D3D9ShaderOverride> m_shaderOverride;
+     std::unique_ptr<D3D9PostAA>      m_postAA;
++    float                            m_postJitter[2] = { 0.0f, 0.0f };   // TAA: viewport offset in pixels
++    bool                             m_postNoiseSet = false;             // c39 holds the frame noise for this draw
++    Vector4                          m_postNoiseSaved;                   // the application's c39
++
++    static constexpr uint32_t        PostFrameNoiseRegister = 39u;
++
++    /**
++     * \brief Frame noise for the replaced light pre-pass shaders (common/gbuffer_ao.hlsli): set in c39 for this draw
++     *        only, the application's value comes back right after it (RestorePostFrameNoise)
++     */
++    void SetPostFrameNoise(float Noise, float ShadowDebug) {
++      if ((Noise == 0.0f && ShadowDebug == 0.0f) || m_postNoiseSet)
++        return;
++      m_postNoiseSaved = m_state.psConsts->fConsts[PostFrameNoiseRegister];
++      const float value[4] = { Noise, ShadowDebug, 0.0f, 0.0f };
++      SetPixelShaderConstantF(PostFrameNoiseRegister, value, 1);
++      m_postNoiseSet = true;
++    }
++
++  public:
++
++    void RestorePostFrameNoise() {
++      if (likely(!m_postNoiseSet))
++        return;
++      m_postNoiseSet = false;
++      SetPixelShaderConstantF(PostFrameNoiseRegister, m_postNoiseSaved.data, 1);
++    }
++
++    /// Restores c39 when a draw call returns
++    struct PostFrameNoiseGuard {
++      D3D9DeviceEx* device;
++      ~PostFrameNoiseGuard() { device->RestorePostFrameNoise(); }
++    };
++
++  private:
++
++    /**
++     * \brief Sets the TAA sub-pixel offset of the current draw (marks the viewport dirty when it changes)
++     */
++    void UpdatePostJitter();
++
++    /**
++     * \brief Reads the camera of a light pre-pass draw for TAA (vertex data, view matrix constants)
++     */
++    void CapturePostCamera(uint32_t ViewMatRegister, INT FirstVertex, UINT NumVertices);
+ 
+     VkImageLayout                   m_hazardLayout = VK_IMAGE_LAYOUT_GENERAL;
+ 
+diff --git a/src/d3d9/d3d9_options.cpp b/src/d3d9/d3d9_options.cpp
+index 4a8bca0..c9e2865 100644
+--- a/src/d3d9/d3d9_options.cpp
++++ b/src/d3d9/d3d9_options.cpp
+@@ -93,12 +93,14 @@ namespace dxvk {
+     this->postAAPath                    = config.getOption<std::string> ("d3d9.postAAPath",                    "");
+     this->postAAKey                     = config.getOption<int32_t>     ("d3d9.postAAKey",                     0x2D);   // Insert
+     this->postAAGBufferShaders          = config.getOption<std::string> ("d3d9.postAAGBufferShaders",          "");
++    this->postTAA                       = config.getOption<bool>        ("d3d9.postTAA",                       false);
+ 
+     if (this->postAAGBufferShaders.empty()) {
+-      // div2_PreLightPass Sun_..._VSM_Char, Sun_..._VSM_Char_Terrain, Hemisphere_Packed_ViewSpace
+-      this->postAAGBufferShaders = "e6bef6f7376173eb73df5390447a1067939c5e8a,"
+-                                   "d50c5e8e8201ae4165e7edeca1b991f8cf1c16bf,"
+-                                   "6119555ad010ccf40568e7dfdeaf0405dc7ea8ff";
++      // div2_PreLightPass Sun_..._VSM_Char, Sun_..._VSM_Char_Terrain (ViewMat c24, EyePosition c28),
++      // Hemisphere_Packed_ViewSpace (ViewMat c0)
++      this->postAAGBufferShaders = "e6bef6f7376173eb73df5390447a1067939c5e8a:24,"
++                                   "d50c5e8e8201ae4165e7edeca1b991f8cf1c16bf:24,"
++                                   "6119555ad010ccf40568e7dfdeaf0405dc7ea8ff:0";
+     }
+ 
+     if (this->postAATrigger.empty())
+diff --git a/src/d3d9/d3d9_options.h b/src/d3d9/d3d9_options.h
+index afb3ca6..e348b33 100644
+--- a/src/d3d9/d3d9_options.h
++++ b/src/d3d9/d3d9_options.h
+@@ -210,9 +210,14 @@ namespace dxvk {
+ 
+     /// Pixel shaders (SHA-1 of the original bytecode, comma separated) that read the engine's
+     /// packed depth + normal buffer at sampler 0 (light pre-pass); their texture is used for
+-    /// geometry-aware SMAA edges. Empty = the light pre-pass shaders of Divinity II.
++    /// geometry-aware SMAA edges and TAA. "sha1:N": the shader has the view matrix at cN..cN+2,
++    /// its draws also give the camera for TAA. Empty = the light pre-pass shaders of Divinity II.
+     std::string postAAGBufferShaders;
+ 
++    /// Divinity II Reborn temporal anti-aliasing after SMAA (needs d3d9.postAA): sub-pixel jitter of
++    /// the scene and accumulation of the frames, reprojected with the engine's depth buffer
++    bool postTAA;
++
+     /// Shader dump path
+     std::string shaderDumpPath;
+ 
+diff --git a/src/d3d9/d3d9_post_aa.cpp b/src/d3d9/d3d9_post_aa.cpp
+index a353d9b..be9b99f 100644
+--- a/src/d3d9/d3d9_post_aa.cpp
++++ b/src/d3d9/d3d9_post_aa.cpp
+@@ -11,6 +11,7 @@
+ #include "../util/util_env.h"
+ #include "../util/util_string.h"
+ 
++#include <cmath>
+ #include <cstring>
+ #include <fstream>
+ #include <iterator>
+@@ -19,16 +20,64 @@ namespace dxvk {
+ 
+   static const char* const PassNames[3] = { "smaa_edge", "smaa_weight", "smaa_blend" };
+ 
++  static float Dot3(const float* a, const float* b) {
++    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
++  }
++
++  static float Length3(const float* a) {
++    return std::sqrt(Dot3(a, a));
++  }
++
++  // Inverse of a row-major 3x3 matrix; false if (nearly) singular
++  static bool Invert3(const float m[9], float inv[9]) {
++    float c0 = m[4] * m[8] - m[5] * m[7];
++    float c1 = m[5] * m[6] - m[3] * m[8];
++    float c2 = m[3] * m[7] - m[4] * m[6];
++    float det = m[0] * c0 + m[1] * c1 + m[2] * c2;
++    float scale = std::fabs(m[0]) + std::fabs(m[4]) + std::fabs(m[8]) + 1e-30f;
++
++    if (!(std::fabs(det) > 1e-9f * scale * scale * scale))
++      return false;
++
++    float r = 1.0f / det;
++    inv[0] = c0 * r; inv[1] = (m[2] * m[7] - m[1] * m[8]) * r; inv[2] = (m[1] * m[5] - m[2] * m[4]) * r;
++    inv[3] = c1 * r; inv[4] = (m[0] * m[8] - m[2] * m[6]) * r; inv[5] = (m[2] * m[3] - m[0] * m[5]) * r;
++    inv[6] = c2 * r; inv[7] = (m[1] * m[6] - m[0] * m[7]) * r; inv[8] = (m[0] * m[4] - m[1] * m[3]) * r;
++    return true;
++  }
++
++  static float Halton(uint32_t index, uint32_t base) {
++    float f = 1.0f, r = 0.0f;
++
++    while (index) {
++      f /= float(base);
++      r += f * float(index % base);
++      index /= base;
++    }
++
++    return r;
++  }
++
++
+   D3D9PostAA::D3D9PostAA(D3D9DeviceEx* pDevice, const D3D9Options& Options)
+-  : m_device(pDevice), m_trigger(Options.postAATrigger), m_key(Options.postAAKey) {
++  : m_device(pDevice), m_trigger(Options.postAATrigger), m_taa(Options.postTAA), m_key(Options.postAAKey) {
++    // "sha1" or "sha1:register of the view matrix" (the camera for TAA is read at draws of these shaders)
+     for (size_t start = 0; start < Options.postAAGBufferShaders.size(); ) {
+       size_t end = Options.postAAGBufferShaders.find(',', start);
+       if (end == std::string::npos)
+         end = Options.postAAGBufferShaders.size();
+-      std::string hash = Options.postAAGBufferShaders.substr(start, end - start);
+-      size_t first = hash.find_first_not_of(" \t"), last = hash.find_last_not_of(" \t");
+-      if (first != std::string::npos)
+-        m_gbufferShaders.push_back(hash.substr(first, last - first + 1));
++      std::string entry = Options.postAAGBufferShaders.substr(start, end - start);
++      size_t first = entry.find_first_not_of(" \t"), last = entry.find_last_not_of(" \t");
++      if (first != std::string::npos) {
++        entry = entry.substr(first, last - first + 1);
++        GBufferShader shader = { entry, -2 };
++        size_t colon = entry.find(':');
++        if (colon != std::string::npos) {
++          shader.hash = entry.substr(0, colon);
++          shader.viewMat = std::atoi(entry.c_str() + colon + 1);
++        }
++        m_gbufferShaders.push_back(shader);
++      }
+       start = end + 1;
+     }
+ 
+@@ -45,8 +94,12 @@ namespace dxvk {
+       dir += '\\';
+ 
+     m_dir = dir;
+-    Logger::info(str::format("D3D9 post AA: SMAA after pixel shader ", m_trigger, ", files from ", m_dir,
+-      m_key > 0 ? str::format(", key VK ", m_key, " cycles SMAA / off / edges / weights") : std::string()));
++    m_mode = m_taa ? ModeSmaaTaa : ModeSmaa;
++    Logger::info(str::format("D3D9 post AA: ", m_taa ? "SMAA + TAA" : "SMAA", " after pixel shader ", m_trigger,
++      ", files from ", m_dir, m_key > 0 ? str::format(", key VK ", m_key, m_taa
++        ? " cycles SMAA + TAA / TAA / SMAA / off / edges / weights / shadow cascades"
++        : " cycles SMAA / off / edges / weights / shadow cascades")
++        : std::string()));
+   }
+ 
+ 
+@@ -55,6 +108,7 @@ namespace dxvk {
+       m_target->Release();
+ 
+     ReleaseTargets();
++    ReleaseTaaTargets();
+   }
+ 
+ 
+@@ -63,18 +117,18 @@ namespace dxvk {
+   }
+ 
+ 
+-  bool D3D9PostAA::IsGBufferReader(const void* pBytecode, size_t Length) const {
++  int32_t D3D9PostAA::GBufferReader(const void* pBytecode, size_t Length) const {
+     if (!Length || m_gbufferShaders.empty())
+-      return false;
++      return -1;
+ 
+     std::string hash = Sha1Hash::compute(pBytecode, Length).toString();
+ 
+-    for (const auto& h : m_gbufferShaders) {
+-      if (h == hash)
+-        return true;
++    for (const auto& s : m_gbufferShaders) {
++      if (s.hash == hash)
++        return s.viewMat;
+     }
+ 
+-    return false;
++    return -1;
+   }
+ 
+ 
+@@ -87,8 +141,130 @@ namespace dxvk {
+   }
+ 
+ 
++  void D3D9PostAA::CameraUnavailable(const char* pReason) {
++    for (const auto& w : m_cameraWarnings) {
++      if (w == pReason)
++        return;
++    }
++
++    m_cameraWarnings.push_back(pReason);
++    Logger::warn(str::format("D3D9 post TAA: no camera from a light pre-pass draw: ", pReason));
++  }
++
++
++  void D3D9PostAA::NoteCamera(const float* pViewMat, const float* pEyeHint, const float* pShadowHint, const float* pWorldViewProj,
++                              const D3D9PostCameraVertex* pVertices, uint32_t Count) {
++    // Screen position of every vertex (the vertex shader: clip = dp4 of (pos, 1) with c0..c3)
++    // and its ray; the quad is flat on the screen (same w everywhere), so the ray is affine in ndc
++    float n[9] = { }, rhs[3][3] = { }, w0 = 0.0f, rayMax = 0.0f;
++    float ndc[8][2], ray[8][3];
++
++    if (Count < 3 || Count > 8) {
++      CameraUnavailable("the draw is not a full-screen quad");
++      return;
++    }
++
++    for (uint32_t i = 0; i < Count; i++) {
++      const float p[4] = { pVertices[i].pos[0], pVertices[i].pos[1], pVertices[i].pos[2], 1.0f };
++      float clip[4];
++
++      for (uint32_t k = 0; k < 4; k++)
++        clip[k] = p[0] * pWorldViewProj[4 * k] + p[1] * pWorldViewProj[4 * k + 1]
++                + p[2] * pWorldViewProj[4 * k + 2] + p[3] * pWorldViewProj[4 * k + 3];
++
++      if (i == 0)
++        w0 = clip[3];
++
++      if (!(clip[3] > 0.0f) || std::fabs(clip[3] - w0) > 1e-3f * std::fabs(w0)) {
++        CameraUnavailable("the quad is not flat on the screen");
++        return;
++      }
++
++      ndc[i][0] = clip[0] / clip[3];
++      ndc[i][1] = clip[1] / clip[3];
++
++      for (uint32_t k = 0; k < 3; k++)
++        ray[i][k] = pVertices[i].b[k] - pVertices[i].a[k];
++
++      rayMax = std::max(rayMax, Length3(ray[i]));
++
++      const float f[3] = { 1.0f, ndc[i][0], ndc[i][1] };
++
++      for (uint32_t r = 0; r < 3; r++) {
++        for (uint32_t c = 0; c < 3; c++)
++          n[3 * r + c] += f[r] * f[c];
++        for (uint32_t k = 0; k < 3; k++)
++          rhs[k][r] += f[r] * ray[i][k];
++      }
++    }
++
++    float inv[9];
++
++    if (!(rayMax > 0.0f) || !Invert3(n, inv)) {
++      CameraUnavailable("the quad has no rays");
++      return;
++    }
++
++    Camera cam;
++
++    for (uint32_t k = 0; k < 3; k++) {
++      float coef[3];
++      for (uint32_t r = 0; r < 3; r++)
++        coef[r] = inv[3 * r] * rhs[k][0] + inv[3 * r + 1] * rhs[k][1] + inv[3 * r + 2] * rhs[k][2];
++      cam.ray0[k] = coef[0];
++      cam.rayX[k] = coef[1];
++      cam.rayY[k] = coef[2];
++    }
++
++    for (uint32_t i = 0; i < Count; i++) {
++      for (uint32_t k = 0; k < 3; k++) {
++        float fit = cam.ray0[k] + ndc[i][0] * cam.rayX[k] + ndc[i][1] * cam.rayY[k];
++        if (std::fabs(fit - ray[i][k]) > 1e-3f * rayMax) {
++          CameraUnavailable("the rays of the quad are not linear across the screen");
++          return;
++        }
++      }
++    }
++
++    // Eye from the view matrix: view = R * world + t (rows of R in xyz, t in w), eye = -R^T t
++    for (uint32_t j = 0; j < 3; j++)
++      cam.eye[j] = -(pViewMat[j] * pViewMat[3] + pViewMat[4 + j] * pViewMat[7] + pViewMat[8 + j] * pViewMat[11]);
++
++    cam.valid = true;
++    m_camera = cam;
++
++    if (!m_cameraLogged) {
++      m_cameraLogged = true;
++      const float axis[3] = { pViewMat[8], pViewMat[9], pViewMat[10] };
++      float cosine = Dot3(axis, cam.ray0) / (Length3(axis) * Length3(cam.ray0) + 1e-30f);
++      Logger::info(str::format("D3D9 post TAA: camera from the light pre-pass: eye (", cam.eye[0], ", ", cam.eye[1], ", ",
++        cam.eye[2], "), constant after the view matrix (", pEyeHint[0], ", ", pEyeHint[1], ", ", pEyeHint[2],
++        "), far ray at the centre (", cam.ray0[0], ", ", cam.ray0[1], ", ", cam.ray0[2], ") length ", Length3(cam.ray0),
++        ", half width ", Length3(cam.rayX), ", half height ", Length3(cam.rayY),
++        ", cosine to the view z axis ", cosine, ", ", Count, " vertices; constants 10/11 after the view matrix (sun passes: "
++        "cascade start distances, shadow far distance) (", pShadowHint[0], ", ", pShadowHint[1], ", ", pShadowHint[2], ", ",
++        pShadowHint[3], ") ", pShadowHint[4]));
++    }
++  }
++
++
++  bool D3D9PostAA::Jitter(UINT Width, UINT Height, float* pOffset) const {
++    if (!m_jitterActive || m_running || m_armedThisFrame || Width != m_jitterWidth || Height != m_jitterHeight)
++      return false;
++
++    pOffset[0] = m_jitter[0];
++    pOffset[1] = m_jitter[1];
++    return true;
++  }
++
++
+   void D3D9PostAA::Arm(D3D9Surface* pTarget) {
+-    if (m_failed || m_running || pTarget == nullptr || pTarget == m_target)
++    if (m_failed || m_running || pTarget == nullptr)
++      return;
++
++    m_armedThisFrame = true;
++
++    if (pTarget == m_target)
+       return;
+ 
+     pTarget->AddRef();
+@@ -100,6 +276,27 @@ namespace dxvk {
+   }
+ 
+ 
++  void D3D9PostAA::OnPresent() {
++    if (!m_taa)
++      return;
++
++    // Jitter the next frame only while TAA keeps running; without it the history is stale
++    m_jitterActive = m_taaRanThisFrame && UsesTaa();
++
++    if (!m_taaRanThisFrame)
++      m_historyValid = false;
++
++    m_taaRanThisFrame = false;
++    m_armedThisFrame = false;
++    m_camera.valid = false;
++
++    // Halton (2, 3), 8 frames: offsets within +-0.44 pixel, so full-screen quads still cover every pixel
++    uint32_t index = (m_frame++ % 8u) + 1u;
++    m_jitter[0] = Halton(index, 2u) - 0.5f;
++    m_jitter[1] = Halton(index, 3u) - 0.5f;
++  }
++
++
+   std::vector<char> D3D9PostAA::ReadFile(const std::string& Path) {
+     std::ifstream file(str::topath(Path.c_str()).c_str(), std::ios_base::binary);
+ 
+@@ -116,52 +313,92 @@ namespace dxvk {
+   }
+ 
+ 
++  void D3D9PostAA::DisableTaa(const std::string& Reason) {
++    m_taa = false;
++    m_jitterActive = false;
++    m_historyValid = false;
++
++    if (m_mode == ModeSmaaTaa || m_mode == ModeTaa)
++      m_mode = ModeSmaa;
++
++    Logger::err(str::format("D3D9 post TAA: disabled, ", Reason));
++  }
++
++
++  void D3D9PostAA::SkipTaa(const std::string& Reason) {
++    m_historyValid = false;
++
++    if (Reason != m_taaSkipped) {
++      m_taaSkipped = Reason;
++      Logger::info(str::format("D3D9 post TAA: skipped, ", Reason));
++    }
++  }
++
++
++  Com<D3D9VertexShader, false> D3D9PostAA::LoadVertexShader(const std::string& Name) {
++    std::vector<char> data = ReadFile(m_dir + Name);
++
++    if (data.size() < 8)
++      return nullptr;
++
++    std::vector<DWORD> code((data.size() + 3u) / 4u + 1u, 0u);
++    std::memcpy(code.data(), data.data(), data.size());
++    IDirect3DVertexShader9* object = nullptr;
++    m_device->CreateVertexShader(code.data(), &object);
++    return Private<D3D9VertexShader>(object);
++  }
++
++
++  Com<D3D9PixelShader, false> D3D9PostAA::LoadPixelShader(const std::string& Name) {
++    std::vector<char> data = ReadFile(m_dir + Name);
++
++    if (data.size() < 8)
++      return nullptr;
++
++    std::vector<DWORD> code((data.size() + 3u) / 4u + 1u, 0u);
++    std::memcpy(code.data(), data.data(), data.size());
++    IDirect3DPixelShader9* object = nullptr;
++    m_device->CreatePixelShader(code.data(), &object);
++    return Private<D3D9PixelShader>(object);
++  }
++
++
+   bool D3D9PostAA::LoadShaders() {
+     for (uint32_t i = 0; i < 3; i++) {
+       if (m_vs[i] && m_ps[i])
+         continue;
+ 
+-      std::vector<char> vs = ReadFile(m_dir + PassNames[i] + ".vs.dxso");
+-      std::vector<char> ps = ReadFile(m_dir + PassNames[i] + ".ps.dxso");
++      m_vs[i] = LoadVertexShader(str::format(PassNames[i], ".vs.dxso"));
++      m_ps[i] = LoadPixelShader(str::format(PassNames[i], ".ps.dxso"));
+ 
+-      if (vs.size() < 8 || ps.size() < 8) {
+-        Disable(str::format("missing ", m_dir, PassNames[i], ".vs/.ps.dxso"));
++      if (m_vs[i] == nullptr || m_ps[i] == nullptr) {
++        Disable(str::format("missing or rejected ", m_dir, PassNames[i], ".vs/.ps.dxso"));
+         return false;
+       }
++    }
+ 
+-      std::vector<DWORD> vsCode((vs.size() + 3u) / 4u + 1u, 0u);
+-      std::vector<DWORD> psCode((ps.size() + 3u) / 4u + 1u, 0u);
+-      std::memcpy(vsCode.data(), vs.data(), vs.size());
+-      std::memcpy(psCode.data(), ps.data(), ps.size());
++    // optional: without it only luma edges are used
++    if (m_psGeometry == nullptr)
++      m_psGeometry = LoadPixelShader("smaa_edge_geo.ps.dxso");
+ 
+-      IDirect3DVertexShader9* vsObject = nullptr;
+-      IDirect3DPixelShader9*  psObject = nullptr;
+-      m_device->CreateVertexShader(vsCode.data(), &vsObject);
+-      m_device->CreatePixelShader(psCode.data(), &psObject);
+-      m_vs[i] = Private<D3D9VertexShader>(vsObject);
+-      m_ps[i] = Private<D3D9PixelShader>(psObject);
++    return LoadTexture("AreaTex.bin", 160u, 560u, m_area)
++        && LoadTexture("SearchTex.bin", 64u, 16u, m_search);
++  }
+ 
+-      if (m_vs[i] == nullptr || m_ps[i] == nullptr) {
+-        Disable(str::format("shader ", PassNames[i], " was rejected"));
+-        return false;
+-      }
+-    }
+ 
+-    if (m_psGeometry == nullptr) {
+-      // optional: without it only luma edges are used
+-      std::vector<char> ps = ReadFile(m_dir + "smaa_edge_geo.ps.dxso");
++  bool D3D9PostAA::LoadTaaShaders() {
++    if (m_taaVs != nullptr && m_taaPs != nullptr)
++      return true;
++
++    m_taaVs = LoadVertexShader("taa.vs.dxso");
++    m_taaPs = LoadPixelShader("taa.ps.dxso");
+ 
+-      if (ps.size() >= 8) {
+-        std::vector<DWORD> psCode((ps.size() + 3u) / 4u + 1u, 0u);
+-        std::memcpy(psCode.data(), ps.data(), ps.size());
+-        IDirect3DPixelShader9* psObject = nullptr;
+-        m_device->CreatePixelShader(psCode.data(), &psObject);
+-        m_psGeometry = Private<D3D9PixelShader>(psObject);
+-      }
++    if (m_taaVs == nullptr || m_taaPs == nullptr) {
++      DisableTaa(str::format("missing or rejected ", m_dir, "taa.vs/.ps.dxso"));
++      return false;
+     }
+ 
+-    return LoadTexture("AreaTex.bin", 160u, 560u, m_area)
+-        && LoadTexture("SearchTex.bin", 64u, 16u, m_search);
++    return true;
+   }
+ 
+ 
+@@ -209,35 +446,95 @@ namespace dxvk {
+ 
+ 
+   bool D3D9PostAA::PrepareTargets(UINT Width, UINT Height, D3DFORMAT Format) {
+-    if (m_color != nullptr && Width == m_width && Height == m_height && Format == m_format)
+-      return true;
++    if (m_edges == nullptr || Width != m_width || Height != m_height) {
++      ReleaseTargets();
+ 
+-    ReleaseTargets();
++      m_edges   = CreateTexture(Width, Height, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT);
++      m_weights = CreateTexture(Width, Height, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT);
+ 
+-    m_color   = CreateTexture(Width, Height, D3DUSAGE_RENDERTARGET, Format, D3DPOOL_DEFAULT);
+-    m_edges   = CreateTexture(Width, Height, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT);
+-    m_weights = CreateTexture(Width, Height, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT);
++      if (m_edges == nullptr || m_weights == nullptr) {
++        ReleaseTargets();
++        Disable(str::format("cannot create ", Width, "x", Height, " render targets"));
++        return false;
++      }
++
++      m_width  = Width;
++      m_height = Height;
++      Logger::info(str::format("D3D9 post AA: render targets ", Width, "x", Height));
++    }
++
++    // Copy of the target: kept per format, the target alternates between scenes with and without light shafts
++    for (uint32_t i = 0; i < 2; i++) {
++      if (m_colors[i] != nullptr && m_colorFormats[i] == Format) {
++        m_color = m_colors[i];
++        return true;
++      }
++    }
+ 
+-    if (m_color == nullptr || m_edges == nullptr || m_weights == nullptr) {
++    uint32_t slot = m_colors[0] == nullptr ? 0u : 1u;
++    m_colors[slot] = CreateTexture(Width, Height, D3DUSAGE_RENDERTARGET, Format, D3DPOOL_DEFAULT);
++    m_colorFormats[slot] = Format;
++    m_color = m_colors[slot];
++
++    if (m_color == nullptr) {
+       ReleaseTargets();
+-      Disable(str::format("cannot create ", Width, "x", Height, " render targets"));
++      Disable(str::format("cannot create a ", Width, "x", Height, " copy of format ", uint32_t(Format)));
+       return false;
+     }
+ 
+-    m_width  = Width;
+-    m_height = Height;
+-    m_format = Format;
+-    Logger::info(str::format("D3D9 post AA: render targets ", Width, "x", Height, " format ", uint32_t(Format)));
++    Logger::info(str::format("D3D9 post AA: copy of the target, format ", uint32_t(Format)));
++    return true;
++  }
++
++
++  bool D3D9PostAA::PrepareTaaTargets(UINT Width, UINT Height, D3DFORMAT GBufferFormat) {
++    if (m_history[0] != nullptr && Width == m_jitterWidth && Height == m_jitterHeight && GBufferFormat == m_gbufferFormat)
++      return true;
++
++    ReleaseTaaTargets();
++
++    m_history[0]  = CreateTexture(Width, Height, D3DUSAGE_RENDERTARGET, D3DFMT_A16B16G16R16F, D3DPOOL_DEFAULT);
++    m_history[1]  = CreateTexture(Width, Height, D3DUSAGE_RENDERTARGET, D3DFMT_A16B16G16R16F, D3DPOOL_DEFAULT);
++    m_locks[0]    = CreateTexture(Width, Height, D3DUSAGE_RENDERTARGET, D3DFMT_G16R16F, D3DPOOL_DEFAULT);
++    m_locks[1]    = CreateTexture(Width, Height, D3DUSAGE_RENDERTARGET, D3DFMT_G16R16F, D3DPOOL_DEFAULT);
++    m_prevGBuffer = CreateTexture(Width, Height, D3DUSAGE_RENDERTARGET, GBufferFormat, D3DPOOL_DEFAULT);
++
++    if (m_history[0] == nullptr || m_history[1] == nullptr || m_locks[0] == nullptr || m_locks[1] == nullptr
++     || m_prevGBuffer == nullptr) {
++      ReleaseTaaTargets();
++      DisableTaa(str::format("cannot create ", Width, "x", Height, " history targets"));
++      return false;
++    }
++
++    m_jitterWidth   = Width;
++    m_jitterHeight  = Height;
++    m_gbufferFormat = GBufferFormat;
++    Logger::info(str::format("D3D9 post TAA: history ", Width, "x", Height, ", depth + normal copy format ", uint32_t(GBufferFormat)));
+     return true;
+   }
+ 
+ 
+   void D3D9PostAA::ReleaseTargets() {
+     m_color = nullptr;
++    m_colors[0] = nullptr;
++    m_colors[1] = nullptr;
++    m_colorFormats[0] = m_colorFormats[1] = D3DFMT_UNKNOWN;
+     m_edges = nullptr;
+     m_weights = nullptr;
+     m_width = m_height = 0u;
+-    m_format = D3DFMT_UNKNOWN;
++  }
++
++
++  void D3D9PostAA::ReleaseTaaTargets() {
++    m_history[0] = nullptr;
++    m_history[1] = nullptr;
++    m_locks[0] = nullptr;
++    m_locks[1] = nullptr;
++    m_prevGBuffer = nullptr;
++    m_historyValid = false;
++    m_jitterActive = false;
++    m_jitterWidth = m_jitterHeight = 0u;
++    m_gbufferFormat = D3DFMT_UNKNOWN;
+   }
+ 
+ 
+@@ -249,8 +546,11 @@ namespace dxvk {
+ 
+     m_gbuffer = nullptr;
+     m_gbufferFresh = false;
++    m_camera.valid = false;
++    m_prevCamera.valid = false;
+ 
+     ReleaseTargets();
++    ReleaseTaaTargets();
+   }
+ 
+ 
+@@ -261,8 +561,15 @@ namespace dxvk {
+     bool down = (GetAsyncKeyState(m_key) & 0x8000) != 0;
+ 
+     if (down && !m_keyDown) {
+-      static const char* const names[ModeCount] = { "SMAA", "off", "show edges", "show blending weights" };
+-      m_mode = (m_mode + 1u) % ModeCount;
++      static const char* const names[ModeCount] = {
++        "SMAA + TAA", "SMAA + TAA, original lighting (engine shadows, no AO)", "TAA", "SMAA", "off", "show edges",
++        "show blending weights", "show shadow cascades (SMAA)", "show contact shadows", "show ambient occlusion" };
++
++      do {
++        m_mode = (m_mode + 1u) % ModeCount;
++      } while (!m_taa && (m_mode == ModeSmaaTaa || m_mode == ModeTaa));
++
++      m_historyValid = false;
+       Logger::info(str::format("D3D9 post AA: mode ", names[m_mode]));
+     }
+ 
+@@ -279,7 +586,7 @@ namespace dxvk {
+ 
+     PollKey();
+ 
+-    if (m_mode == ModeOff) {
++    if (!UsesSmaa() && !UsesTaa()) {
+       target->Release();
+       return;
+     }
+@@ -295,6 +602,8 @@ namespace dxvk {
+       return;
+     }
+ 
++    bool taa = UsesTaa() && LoadTaaShaders();
++
+     // Save everything the passes touch: a state block for the fixed and shader state,
+     // render targets and depth buffer separately (state blocks do not hold them)
+     IDirect3DStateBlock9* saved = nullptr;
+@@ -330,6 +639,7 @@ namespace dxvk {
+       { D3DRS_SRGBWRITEENABLE, FALSE },     { D3DRS_FOGENABLE, FALSE },
+       { D3DRS_CLIPPLANEENABLE, 0 },         { D3DRS_FILLMODE, D3DFILL_SOLID },
+       { D3DRS_SEPARATEALPHABLENDENABLE, FALSE },
++      { D3DRS_COLORWRITEENABLE1, 0xF },     { D3DRS_COLORWRITEENABLE2, 0xF },
+     };
+ 
+     for (const auto& s : states)
+@@ -340,7 +650,7 @@ namespace dxvk {
+     m_device->SetPixelShaderConstantF(0, metrics, 1);
+     m_device->SetFVF(D3DFVF_XYZ | D3DFVF_TEX1);
+ 
+-    for (DWORD s = 0; s < 3; s++) {
++    for (DWORD s = 0; s < 5; s++) {
+       m_device->SetSamplerState(s, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
+       m_device->SetSamplerState(s, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
+       m_device->SetSamplerState(s, D3DSAMP_MIPFILTER, D3DTEXF_NONE);
+@@ -368,49 +678,151 @@ namespace dxvk {
+       m_device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, quad, sizeof(Vertex));
+     };
+ 
+-    // 1. edges of the scene: where the geometry has edges if this frame's depth + normal buffer
+-    //    matches the target, otherwise (menus, other targets) luma edges
+-    bool geometry = false;
++    // This frame's depth + normal buffer, if the engine drew one for a target of this size
++    bool gbufferMatches = false;
++    D3DSURFACE_DESC gdesc = { };
++
++    if (m_gbufferFresh && m_gbuffer != nullptr) {
++      gbufferMatches = SUCCEEDED(m_gbuffer->GetLevelDesc(0, &gdesc))
++                    && gdesc.Width == desc.Width && gdesc.Height == desc.Height;
++    }
++
++    m_gbufferFresh = false;
+ 
+-    if (m_gbufferFresh && m_gbuffer != nullptr && m_psGeometry != nullptr) {
+-      D3DSURFACE_DESC gdesc;
+-      geometry = SUCCEEDED(m_gbuffer->GetLevelDesc(0, &gdesc))
+-              && gdesc.Width == desc.Width && gdesc.Height == desc.Height;
++    if (UsesSmaa()) {
++      // 1. edges of the scene: where the geometry has edges if this frame's depth + normal buffer
++      //    matches the target, otherwise (menus, other targets) luma edges
++      bool geometry = gbufferMatches && m_psGeometry != nullptr;
+ 
+       if (geometry && !m_geometryLogged) {
+         m_geometryLogged = true;
+         Logger::info(str::format("D3D9 post AA: geometry edges from the engine's depth + normal buffer (",
+           gdesc.Width, "x", gdesc.Height, " format ", uint32_t(gdesc.Format), ")"));
+       }
+-    }
+-
+-    m_gbufferFresh = false;
+ 
+-    m_device->SetTexture(0, m_color.ptr());
+-    m_device->SetTexture(1, geometry ? m_gbuffer.ptr() : nullptr);
+-    m_device->SetTexture(2, nullptr);
+-    filter(0, D3DTEXF_LINEAR);
+-    filter(1, D3DTEXF_POINT);
+-    pass(0, edgesSurface, true, geometry ? m_psGeometry.ptr() : nullptr);
+-
+-    // 2. blending weights
+-    m_device->SetTexture(0, m_edges.ptr());
+-    m_device->SetTexture(1, m_area.ptr());
+-    m_device->SetTexture(2, m_search.ptr());
+-    filter(1, D3DTEXF_LINEAR);
+-    filter(2, D3DTEXF_POINT);
+-    pass(1, weightsSurface, true, nullptr);
+-
+-    // 3. neighbourhood blending into the engine's target (or, for diagnosis, the edges or weights themselves)
+-    if (m_mode == ModeEdges) {
+-      m_device->StretchRect(edgesSurface, nullptr, target, nullptr, D3DTEXF_POINT);
+-    } else if (m_mode == ModeWeights) {
+-      m_device->StretchRect(weightsSurface, nullptr, target, nullptr, D3DTEXF_POINT);
+-    } else {
+       m_device->SetTexture(0, m_color.ptr());
+-      m_device->SetTexture(1, m_weights.ptr());
++      m_device->SetTexture(1, geometry ? m_gbuffer.ptr() : nullptr);
+       m_device->SetTexture(2, nullptr);
+-      pass(2, target, false, nullptr);
++      m_device->SetTexture(3, nullptr);
++      m_device->SetTexture(4, nullptr);
++      filter(0, D3DTEXF_LINEAR);
++      filter(1, D3DTEXF_POINT);
++      pass(0, edgesSurface, true, geometry ? m_psGeometry.ptr() : nullptr);
++
++      // 2. blending weights
++      m_device->SetTexture(0, m_edges.ptr());
++      m_device->SetTexture(1, m_area.ptr());
++      m_device->SetTexture(2, m_search.ptr());
++      filter(1, D3DTEXF_LINEAR);
++      filter(2, D3DTEXF_POINT);
++      pass(1, weightsSurface, true, nullptr);
++
++      // 3. neighbourhood blending into the engine's target (or, for diagnosis, the edges or weights themselves)
++      if (m_mode == ModeEdges) {
++        m_device->StretchRect(edgesSurface, nullptr, target, nullptr, D3DTEXF_POINT);
++      } else if (m_mode == ModeWeights) {
++        m_device->StretchRect(weightsSurface, nullptr, target, nullptr, D3DTEXF_POINT);
++      } else {
++        m_device->SetTexture(0, m_color.ptr());
++        m_device->SetTexture(1, m_weights.ptr());
++        m_device->SetTexture(2, nullptr);
++        pass(2, target, false, nullptr);
++      }
++    }
++
++    // 4. temporal accumulation of the jittered frames into the target and the next history
++    if (taa) {
++      if (!gbufferMatches) {
++        SkipTaa(str::format("no depth + normal buffer of the target's size (", desc.Width, "x", desc.Height, ") in this frame"));
++      } else if (!m_camera.valid) {
++        SkipTaa("no camera from the light pre-pass in this frame");
++      } else if (PrepareTaaTargets(desc.Width, desc.Height, gdesc.Format)) {
++        IDirect3DSurface9* historyWrite = nullptr;
++        IDirect3DSurface9* locksWrite = nullptr;
++        IDirect3DSurface9* gbufferSurface = nullptr;
++        IDirect3DSurface9* prevSurface = nullptr;
++        uint32_t next = m_historyIndex ^ 1u;
++        m_history[next]->GetSurfaceLevel(0, &historyWrite);
++        m_locks[next]->GetSurfaceLevel(0, &locksWrite);
++        m_gbuffer->GetSurfaceLevel(0, &gbufferSurface);
++        m_prevGBuffer->GetSurfaceLevel(0, &prevSurface);
++
++        if (UsesSmaa())
++          m_device->StretchRect(target, nullptr, colorSurface, nullptr, D3DTEXF_POINT);
++
++        const Camera& c = m_camera;
++        const Camera& p = m_prevCamera;
++        float prevRays[9] = {
++          p.ray0[0], p.rayX[0], p.rayY[0],
++          p.ray0[1], p.rayX[1], p.rayY[1],
++          p.ray0[2], p.rayX[2], p.rayY[2],
++        };
++        float inv[9] = { };
++        float eyeDelta[3] = { c.eye[0] - p.eye[0], c.eye[1] - p.eye[1], c.eye[2] - p.eye[2] };
++        bool reset = !m_historyValid || !p.valid || !Invert3(prevRays, inv);
++
++        // Camera cut: the view turned by more than ~45 degrees or the eye jumped by a tenth of the far distance
++        if (!reset) {
++          float cosine = Dot3(c.ray0, p.ray0) / (Length3(c.ray0) * Length3(p.ray0) + 1e-30f);
++          reset = cosine < 0.7f || Length3(eyeDelta) > 0.1f * Length3(p.ray0);
++        }
++
++        // jitter the scene of this frame was drawn with (Jitter() offsets every scene draw of the frame by it)
++        float jitterX = m_jitterActive ? m_jitter[0] : 0.0f;
++        float jitterY = m_jitterActive ? m_jitter[1] : 0.0f;
++
++        float constants[10][4] = {
++          { metrics[0], metrics[1], metrics[2], metrics[3] },
++          { eyeDelta[0], eyeDelta[1], eyeDelta[2], 0.0f },
++          { c.ray0[0], c.ray0[1], c.ray0[2], 0.0f },
++          { c.rayX[0], c.rayX[1], c.rayX[2], 0.0f },
++          { c.rayY[0], c.rayY[1], c.rayY[2], 0.0f },
++          { inv[0], inv[1], inv[2], 0.0f },
++          { inv[3], inv[4], inv[5], 0.0f },
++          { inv[6], inv[7], inv[8], 0.0f },
++          // history weight at rest / in fast motion, no history, relative depth tolerance
++          { 0.9f, 0.7f, reset ? 1.0f : 0.0f, 0.03f },
++          { jitterX, jitterY, m_prevJitter[0], m_prevJitter[1] },
++        };
++        m_device->SetPixelShaderConstantF(0, &constants[0][0], 10);
++
++        m_device->SetRenderTarget(0, target);
++        m_device->SetRenderTarget(1, historyWrite);
++        m_device->SetRenderTarget(2, locksWrite);
++        m_device->SetTexture(0, m_color.ptr());
++        m_device->SetTexture(1, m_history[m_historyIndex].ptr());
++        m_device->SetTexture(2, m_gbuffer.ptr());
++        m_device->SetTexture(3, m_prevGBuffer.ptr());
++        m_device->SetTexture(4, m_locks[m_historyIndex].ptr());
++        filter(0, D3DTEXF_POINT);
++        filter(1, D3DTEXF_LINEAR);
++        filter(2, D3DTEXF_POINT);
++        filter(3, D3DTEXF_POINT);
++        filter(4, D3DTEXF_POINT);
++        m_device->SetVertexShader(m_taaVs.ptr());
++        m_device->SetPixelShader(m_taaPs.ptr());
++        m_device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, quad, sizeof(Vertex));
++        m_device->SetRenderTarget(1, nullptr);
++        m_device->SetRenderTarget(2, nullptr);
++
++        m_device->StretchRect(gbufferSurface, nullptr, prevSurface, nullptr, D3DTEXF_POINT);
++
++        m_historyIndex = next;
++        m_historyValid = true;
++        m_prevCamera = c;
++        m_prevJitter[0] = jitterX;
++        m_prevJitter[1] = jitterY;
++        m_taaRanThisFrame = true;
++        m_taaSkipped.clear();
++
++        if (!m_taaRuns++)
++          Logger::info(str::format("D3D9 post TAA: first pass done on a ", desc.Width, "x", desc.Height, " target"));
++
++        SafeRelease(historyWrite);
++        SafeRelease(locksWrite);
++        SafeRelease(gbufferSurface);
++        SafeRelease(prevSurface);
++      }
+     }
+ 
+     // Restore: render targets first (setting RT0 resets the viewport), then the state block
+diff --git a/src/d3d9/d3d9_post_aa.h b/src/d3d9/d3d9_post_aa.h
+index 393c248..0910590 100644
+--- a/src/d3d9/d3d9_post_aa.h
++++ b/src/d3d9/d3d9_post_aa.h
+@@ -18,7 +18,17 @@ namespace dxvk {
+   struct D3D9Options;
+ 
+   /**
+-   * \brief Divinity II Reborn post anti-aliasing (SMAA before the interface)
++   * \brief Vertex of the engine's light pre-pass quad: POSITION and the two points
++   *        packed into TEXCOORD1..3 whose difference is the world-space ray to the far plane
++   */
++  struct D3D9PostCameraVertex {
++    float pos[3];
++    float a[3];
++    float b[3];
++  };
++
++  /**
++   * \brief Divinity II Reborn post anti-aliasing (SMAA and TAA before the interface)
+    *
+    * The pixel shader whose original bytecode has the SHA-1 d3d9.postAATrigger (the engine's
+    * tonemap pass, HDRScene_FinalScenePass) is marked when it is created. When a draw with it is
+@@ -27,6 +37,10 @@ namespace dxvk {
+    * Direct3D 9 passes (edges, blending weights, neighbourhood blending) with shaders and lookup
+    * textures from d3d9.postAAPath (tools/shaders/build_post.py). The application's state is saved
+    * in a state block plus its render targets and depth buffer and restored afterwards.
++   *
++   * With d3d9.postTAA, a temporal pass follows: depth-tested draws into scene-sized targets are
++   * shifted by a sub-pixel jitter (viewport offset) and the frames are accumulated, reprojected
++   * with the engine's depth buffer and the camera read at the light pre-pass draw.
+    */
+   class D3D9PostAA {
+ 
+@@ -42,15 +56,77 @@ namespace dxvk {
+     bool IsTrigger(const void* pBytecode, size_t Length) const;
+ 
+     /**
+-     * \brief Whether the original bytecode is a shader that reads the depth + normal buffer at sampler 0
++     * \brief Whether the original bytecode reads the depth + normal buffer at sampler 0
++     *
++     * \returns -1: no, -2: yes, without a camera, >= 0: yes, with the view matrix (3 rows) at this
++     *          pixel shader constant register
+      */
+-    bool IsGBufferReader(const void* pBytecode, size_t Length) const;
++    int32_t GBufferReader(const void* pBytecode, size_t Length) const;
+ 
+     /**
+      * \brief A draw with a G-buffer reader was recorded: \p pTexture is this frame's depth + normal buffer
+      */
+     void NoteGBuffer(IDirect3DBaseTexture9* pTexture);
+ 
++    /**
++     * \brief Whether the camera of this frame is still needed (TAA on, not captured yet)
++     */
++    /**
++     * \brief Value for the light pre-pass shaders' frame noise register (c39): changes every frame while TAA runs, 0 otherwise
++     */
++    float FrameNoise() const {
++      if (!m_jitterActive || m_running)
++        return 0.0f;
++      float n = float(m_frame % 1024u) * 0.618034f;
++      return n - float(uint32_t(n)) + 1e-4f;
++    }
++
++    /**
++     * \brief Second value of c39 for the light pre-pass shaders: the debug view (1 shadow cascades, 2 original
++     *        lighting, 3 contact shadows, 4 ambient occlusion), 0 otherwise
++     */
++    float ShadowDebug() const {
++      if (m_failed)
++        return 0.0f;
++      switch (m_mode) {
++        case ModeShadowCascades:   return 1.0f;
++        case ModeOriginalLight:    return 2.0f;
++        case ModeContactShadows:   return 3.0f;
++        case ModeAmbientOcclusion: return 4.0f;
++        default:                   return 0.0f;
++      }
++    }
++
++    bool WantsCamera() const {
++      return m_taa && !m_camera.valid && !m_running && !m_failed;
++    }
++
++    /**
++     * \brief Camera of this frame from a light pre-pass draw
++     *
++     * \param [in] pViewMat Pixel shader constants: view matrix rows (3 x float4, translation in w)
++     * \param [in] pEyeHint Pixel shader constant 4 registers after it (EyePosition of the sun passes), for the log
++     * \param [in] pShadowHint Pixel shader constants 10 and 11 registers after it (sun passes: g_afShadowDistances,
++     *        g_fShadowFarDistance), for the log
++     * \param [in] pWorldViewProj Vertex shader constants c0..c3
++     * \param [in] pVertices Vertices of the draw
++     */
++    void NoteCamera(const float* pViewMat, const float* pEyeHint, const float* pShadowHint, const float* pWorldViewProj,
++                    const D3D9PostCameraVertex* pVertices, uint32_t Count);
++
++    /**
++     * \brief The camera could not be read from a light pre-pass draw (logged once per reason)
++     */
++    void CameraUnavailable(const char* pReason);
++
++    /**
++     * \brief Sub-pixel offset for a depth-tested draw into a target of the given size
++     *
++     * \returns false (offset 0) unless TAA ran in the previous frame on a target of this size and
++     *          the tonemap pass of this frame has not been drawn yet
++     */
++    bool Jitter(UINT Width, UINT Height, float* pOffset) const;
++
+     /**
+      * \brief A draw with the trigger shader was recorded on \p pTarget
+      */
+@@ -61,10 +137,15 @@ namespace dxvk {
+     }
+ 
+     /**
+-     * \brief Runs SMAA on the armed target (call before the next draw, clear, copy or present)
++     * \brief Runs SMAA (and TAA) on the armed target (call before the next draw, clear, copy or present)
+      */
+     void Run();
+ 
++    /**
++     * \brief Frame boundary (before present)
++     */
++    void OnPresent();
++
+     /**
+      * \brief Releases the default-pool resources, which would make a device reset fail
+      */
+@@ -72,17 +153,33 @@ namespace dxvk {
+ 
+   private:
+ 
++    struct GBufferShader {
++      std::string hash;
++      int32_t     viewMat;
++    };
++
++    struct Camera {
++      bool  valid = false;
++      float eye[3];
++      float ray0[3], rayX[3], rayY[3];   // ray(ndc) = ray0 + ndc.x * rayX + ndc.y * rayY
++    };
++
+     D3D9DeviceEx*           m_device;
+     std::string             m_dir;
+     std::string             m_trigger;
++    bool                    m_taa;
+ 
+     D3D9Surface*            m_target   = nullptr;   // referenced while armed
+     bool                    m_running  = false;
+     bool                    m_failed   = false;     // missing files etc.: disabled, logged once
+     uint32_t                m_runs     = 0u;
+ 
+-    // d3d9.postAAKey cycles the mode while playing: SMAA, off, show edges, show blending weights
+-    enum Mode : uint32_t { ModeSmaa = 0, ModeOff = 1, ModeEdges = 2, ModeWeights = 3, ModeCount = 4 };
++    // d3d9.postAAKey cycles the mode while playing
++    enum Mode : uint32_t {
++      ModeSmaaTaa = 0, ModeOriginalLight = 1, ModeTaa = 2, ModeSmaa = 3, ModeOff = 4, ModeEdges = 5, ModeWeights = 6,
++      ModeShadowCascades = 7, ModeContactShadows = 8, ModeAmbientOcclusion = 9,
++      ModeCount = 10
++    };
+     int32_t                 m_key      = 0;
+     bool                    m_keyDown  = false;
+     uint32_t                m_mode     = ModeSmaa;
+@@ -95,31 +192,79 @@ namespace dxvk {
+     Com<D3D9Texture2D, false>    m_gbuffer;      // engine's depth + normal buffer of this frame
+     bool                         m_gbufferFresh = false;
+     bool                         m_geometryLogged = false;
+-    std::vector<std::string>     m_gbufferShaders;
++    std::vector<GBufferShader>   m_gbufferShaders;
+     Com<D3D9Texture2D, false>    m_area;
+     Com<D3D9Texture2D, false>    m_search;
+ 
+-    Com<D3D9Texture2D, false>    m_color;     // copy of the target
++    Com<D3D9Texture2D, false>    m_color;     // copy of the target (one of m_colors)
++    Com<D3D9Texture2D, false>    m_colors[2]; // per target format: the tonemap writes the back buffer (X8R8G8B8) or,
++    D3DFORMAT               m_colorFormats[2] = { D3DFMT_UNKNOWN, D3DFMT_UNKNOWN };   // with light shafts, A8R8G8B8
+     Com<D3D9Texture2D, false>    m_edges;
+     Com<D3D9Texture2D, false>    m_weights;
+     UINT                    m_width    = 0u;
+     UINT                    m_height   = 0u;
+-    D3DFORMAT               m_format   = D3DFMT_UNKNOWN;
++
++    // TAA
++    Com<D3D9VertexShader, false> m_taaVs;
++    Com<D3D9PixelShader, false>  m_taaPs;
++    Com<D3D9Texture2D, false>    m_history[2];   // A16B16G16R16F, ping-pong
++    Com<D3D9Texture2D, false>    m_locks[2];     // G16R16F thin-detail locks (time left, depth), ping-pong
++    Com<D3D9Texture2D, false>    m_prevGBuffer;  // copy of the previous frame's depth + normal buffer
++    uint32_t                m_historyIndex = 0u;
++    bool                    m_historyValid = false;
++    D3DFORMAT               m_gbufferFormat = D3DFMT_UNKNOWN;
++    Camera                  m_camera;            // this frame
++    Camera                  m_prevCamera;        // frame of the history
++    bool                    m_cameraLogged = false;
++    std::vector<std::string> m_cameraWarnings;
++    bool                    m_taaRanThisFrame = false;
++    bool                    m_armedThisFrame  = false;
++    bool                    m_jitterActive    = false;
++    UINT                    m_jitterWidth     = 0u;
++    UINT                    m_jitterHeight    = 0u;
++    float                   m_jitter[2]       = { 0.0f, 0.0f };
++    float                   m_prevJitter[2]   = { 0.0f, 0.0f };   // jitter of the previous depth + normal buffer
++    uint32_t                m_frame           = 0u;
++    uint32_t                m_taaRuns         = 0u;
++    std::string             m_taaSkipped;        // last logged reason why TAA did not run
+ 
+     bool LoadShaders();
+ 
++    bool LoadTaaShaders();
++
++    Com<D3D9PixelShader, false> LoadPixelShader(const std::string& Name);
++
++    Com<D3D9VertexShader, false> LoadVertexShader(const std::string& Name);
++
+     bool LoadTexture(const char* pName, UINT Width, UINT Height, Com<D3D9Texture2D, false>& Texture);
+ 
+     Com<D3D9Texture2D, false> CreateTexture(UINT Width, UINT Height, DWORD Usage, D3DFORMAT Format, D3DPOOL Pool);
+ 
+     bool PrepareTargets(UINT Width, UINT Height, D3DFORMAT Format);
+ 
++    bool PrepareTaaTargets(UINT Width, UINT Height, D3DFORMAT GBufferFormat);
++
+     void ReleaseTargets();
+ 
++    void ReleaseTaaTargets();
++
+     void Disable(const std::string& Reason);
+ 
++    void DisableTaa(const std::string& Reason);
++
++    void SkipTaa(const std::string& Reason);
++
+     void PollKey();
+ 
++    bool UsesSmaa() const {
++      return m_mode != ModeTaa && m_mode != ModeOff;
++    }
++
++    bool UsesTaa() const {
++      return m_taa && (m_mode == ModeSmaaTaa || m_mode == ModeTaa || m_mode == ModeOriginalLight
++                    || m_mode == ModeContactShadows || m_mode == ModeAmbientOcclusion);
++    }
++
+     static std::vector<char> ReadFile(const std::string& Path);
+ 
+     template<typename T>
+diff --git a/src/d3d9/d3d9_shader.h b/src/d3d9/d3d9_shader.h
+index d3ea54d..04671b8 100644
+--- a/src/d3d9/d3d9_shader.h
++++ b/src/d3d9/d3d9_shader.h
+@@ -211,10 +211,16 @@ namespace dxvk {
+     }
+ 
+     bool IsPostGBufferReader() const {
++      return m_postGBufferReader != -1;
++    }
++
++    /// Pixel shader register of the view matrix for the TAA camera, negative if none
++    int32_t GetPostViewMatRegister() const {
+       return m_postGBufferReader;
+     }
+ 
+-    void SetPostGBufferReader(bool Reader) {
++    /// -1: not a G-buffer reader, -2: reader without camera, >= 0: reader with the view matrix at this register
++    void SetPostGBufferReader(int32_t Reader) {
+       m_postGBufferReader = Reader;
+     }
+ 
+@@ -226,7 +232,7 @@ namespace dxvk {
+     uint32_t         m_bytecodeLength;
+     uint32_t         m_censusId = 0u;
+     bool             m_postTrigger = false;
+-    bool             m_postGBufferReader = false;
++    int32_t          m_postGBufferReader = -1;
+ 
+   };
+ 

@@ -393,8 +393,7 @@ void diag_on_dinput(void* idi8)
 /* The game is a 32-bit LAA process (4 GB of address space). Private bytes do not show reserved-but-uncommitted
    ranges or fragmentation, so walk the whole address space: used = everything not free, plus the largest free
    block (a big texture or archive buffer needs one contiguous range). Values in MB. */
-typedef struct { DWORD usedMB, freeMB, largestMB, privMB; } AddrSpace;
-static void addr_space(AddrSpace* a)
+void addr_space(AddrSpace* a)
 {
     MEMORY_BASIC_INFORMATION mi; DWORD p = 0x10000, usedKB = 0, freeKB = 0, bigKB = 0;
     while (p < 0xFFFF0000 && VirtualQuery((void*)p, &mi, sizeof mi)) {

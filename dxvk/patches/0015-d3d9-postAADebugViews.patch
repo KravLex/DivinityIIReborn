@@ -1,0 +1,75 @@
+diff --git a/src/d3d9/d3d9_options.cpp b/src/d3d9/d3d9_options.cpp
+index 7ea2190..8c11ae7 100644
+--- a/src/d3d9/d3d9_options.cpp
++++ b/src/d3d9/d3d9_options.cpp
+@@ -94,6 +94,7 @@ namespace dxvk {
+     this->postAAKey                     = config.getOption<int32_t>     ("d3d9.postAAKey",                     0x2D);   // Insert
+     this->postAAGBufferShaders          = config.getOption<std::string> ("d3d9.postAAGBufferShaders",          "");
+     this->postTAA                       = config.getOption<bool>        ("d3d9.postTAA",                       false);
++    this->postAADebugViews              = config.getOption<bool>        ("d3d9.postAADebugViews",              false);
+     this->gpuTimers                     = config.getOption<bool>        ("d3d9.gpuTimers",                     false);
+     this->gpuTimersReportSeconds        = config.getOption<float>       ("d3d9.gpuTimersReportSeconds",        5.0f);
+ 
+diff --git a/src/d3d9/d3d9_options.h b/src/d3d9/d3d9_options.h
+index 788dd0a..bbcb866 100644
+--- a/src/d3d9/d3d9_options.h
++++ b/src/d3d9/d3d9_options.h
+@@ -218,6 +218,10 @@ namespace dxvk {
+     /// the scene and accumulation of the frames, reprojected with the engine's depth buffer
+     bool postTAA;
+ 
++    /// Divinity II Reborn: the post AA key also cycles the development views (original lighting, SMAA edges and
++    /// weights, shadow cascades, contact shadows, ambient occlusion); false = SMAA + TAA, TAA, SMAA and off only
++    bool postAADebugViews;
++
+     /// Divinity II Reborn GPU timers: average GPU time per frame of the light pre-pass draws that read the
+     /// depth + normal buffer and of the post AA passes, written to the log every 5 seconds (development)
+     bool gpuTimers;
+diff --git a/src/d3d9/d3d9_post_aa.cpp b/src/d3d9/d3d9_post_aa.cpp
+index be9b99f..9f999ec 100644
+--- a/src/d3d9/d3d9_post_aa.cpp
++++ b/src/d3d9/d3d9_post_aa.cpp
+@@ -60,7 +60,7 @@ namespace dxvk {
+ 
+ 
+   D3D9PostAA::D3D9PostAA(D3D9DeviceEx* pDevice, const D3D9Options& Options)
+-  : m_device(pDevice), m_trigger(Options.postAATrigger), m_taa(Options.postTAA), m_key(Options.postAAKey) {
++  : m_device(pDevice), m_trigger(Options.postAATrigger), m_taa(Options.postTAA), m_debugViews(Options.postAADebugViews), m_key(Options.postAAKey) {
+     // "sha1" or "sha1:register of the view matrix" (the camera for TAA is read at draws of these shaders)
+     for (size_t start = 0; start < Options.postAAGBufferShaders.size(); ) {
+       size_t end = Options.postAAGBufferShaders.find(',', start);
+@@ -96,9 +96,9 @@ namespace dxvk {
+     m_dir = dir;
+     m_mode = m_taa ? ModeSmaaTaa : ModeSmaa;
+     Logger::info(str::format("D3D9 post AA: ", m_taa ? "SMAA + TAA" : "SMAA", " after pixel shader ", m_trigger,
+-      ", files from ", m_dir, m_key > 0 ? str::format(", key VK ", m_key, m_taa
+-        ? " cycles SMAA + TAA / TAA / SMAA / off / edges / weights / shadow cascades"
+-        : " cycles SMAA / off / edges / weights / shadow cascades")
++      ", files from ", m_dir, m_key > 0 ? str::format(", key VK ", m_key,
++        m_taa ? " cycles SMAA + TAA / TAA / SMAA / off" : " cycles SMAA / off",
++        m_debugViews ? " / development views (original lighting, edges, weights, cascades, contact shadows, AO)" : "")
+         : std::string()));
+   }
+ 
+@@ -567,7 +567,8 @@ namespace dxvk {
+ 
+       do {
+         m_mode = (m_mode + 1u) % ModeCount;
+-      } while (!m_taa && (m_mode == ModeSmaaTaa || m_mode == ModeTaa));
++      } while ((!m_taa && (m_mode == ModeSmaaTaa || m_mode == ModeTaa))
++            || (!m_debugViews && (m_mode == ModeOriginalLight || m_mode > ModeOff)));
+ 
+       m_historyValid = false;
+       Logger::info(str::format("D3D9 post AA: mode ", names[m_mode]));
+diff --git a/src/d3d9/d3d9_post_aa.h b/src/d3d9/d3d9_post_aa.h
+index 0910590..a94a205 100644
+--- a/src/d3d9/d3d9_post_aa.h
++++ b/src/d3d9/d3d9_post_aa.h
+@@ -168,6 +168,7 @@ namespace dxvk {
+     std::string             m_dir;
+     std::string             m_trigger;
+     bool                    m_taa;
++    bool                    m_debugViews;
+ 
+     D3D9Surface*            m_target   = nullptr;   // referenced while armed
+     bool                    m_running  = false;

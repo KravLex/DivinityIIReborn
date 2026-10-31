@@ -48,3 +48,6 @@ CreateEventA@16
 SetEvent@4
 WaitForMultipleObjects@16
 AddVectoredExceptionHandler@8
+FindFirstFileA@8
+FindNextFileA@8
+FindClose@4

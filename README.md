@@ -4,23 +4,53 @@
 
 A visual, engine and quality-of-life overhaul for **Divinity II: Developer's Cut** (Steam, Windows):
 a spoiler-free **mind-reading advisor**, **4x AI-upscaled textures**, HD normal maps and icons, a fix for the
-game's **hard, flickering shadow edges**, 8K shadow maps, smoother bloom and sun rays, correct **ultrawide menus**,
-intro skip and more. The mod does not change gameplay, balance or saves (an optional, separately installed
-skill-balance module is the only exception, see below).
+game's **hard, flickering shadow edges**, **SMAA + TAA anti-aliasing** before the interface, 8K shadow maps,
+smoother bloom and sun rays, correct **ultrawide menus**, intro skip and more. The mod does not change gameplay,
+balance or saves (an optional, separately installed skill-balance module is the only exception, see below).
 
 **Download, full description and installation:** Nexus Mods — *(link)*
 
 This repository contains the source code of **Div2Fix** (`bin/dinput8.dll`), the engine part of the mod,
-and the patches of the modified DXVK build (`bin/d3d9.dll`) shipped since 1.4.
+the patches of the modified DXVK build (`bin/d3d9.dll`) shipped since 1.4, and since 1.5 the sources of the
+replacement shaders and of SMAA/TAA (`shaders/`, built by `tools/shaders/`).
 
 ## For players
 
 **Requirements:** Divinity II: Developer's Cut (Steam), a Vulkan 1.3 GPU,
 and **[Div2Patch](https://github.com/BlanknameES/Div2Patch)** by BlanknameES (install it first).
 
-**Installation:** install Div2Patch → extract `DivinityIIReborn_v1.4.2.zip` into the game folder (the one with
+**Installation:** install Div2Patch → extract `DivinityIIReborn_v1.5.zip` into the game folder (the one with
 `bin` and `Data`) → optionally extract the HD texture pack there too → play.
-Settings: `bin\Div2Fix.ini`. Uninstall: `_Div2Reborn\uninstall.cmd`.
+Settings: `bin\Div2Fix.ini`, `bin\dxvk.conf`. Uninstall: `_Div2Reborn\uninstall.cmd`.
+
+### New in 1.5
+
+* **SMAA + TAA before the interface** (DXVK patches 0011, 0012) — right after the engine's tonemap draw
+  (`HDRScene_FinalScenePass`, found by the SHA-1 of its pixel shader) DXVK runs SMAA (edges from luma and from the
+  engine's packed depth + normal G-buffer) and TAA: sub-pixel jitter of the projection, reprojection with the
+  engine's depth and the camera read from the light pre-pass constants, rejection of disoccluded pixels. The
+  interface is drawn afterwards and stays sharp. F11 cycles SMAA + TAA / TAA / SMAA / off. 0.8 ms GPU per frame at
+  3440x1440 (RTX 3080 Ti).
+* **Shadow cascade seam fixed, shadows twice as far** (DXVK patch 0010 + `shaders/far`) — DXVK replaces two pixel
+  shaders of the sun light pre-pass (by the SHA-1 of their original bytecode) with recompiled ones: the engine's own
+  VSM test, but blended between cascades over the last 15 % of each cascade (the hard seam used to move with the
+  hero) and extended to 2x the shadow distance with a smooth fade. Constant layout checked against the original
+  effect at build time; `shaders/` rebuilds the shipped `.dxso` files byte for byte.
+* **Archive overlay** (`overlay.c`, `[Overlay]`) — detours the archive registration (`0x697D30`, thiscall, ret 10h)
+  and registers `Data\Win32\Packed\Reborn\*.dv2` before the 12 patch slots, with the patch flags; files in them win
+  over the game and the HD pack (files of the region archives `World\<region>\...` are not overridden). No archive
+  of the game is changed.
+* **Effects pack** (`Reborn\Reborn_FX.dv2`, 64 MB) — 220 of 527 effect textures (`FX_*`) picked by sharpness
+  (`tools/reborn/fx_select.py`: share of strong luminance steps) and upscaled 4x with 4x-UltraSharp; soft glows and
+  smoke were left alone.
+* **Crash fix** (DXVK patch 0014) — stack overflow, mostly when loading a save: the NVIDIA Vulkan driver's
+  `opengl32.dll` subclasses the window on top of DXVK; when the swapchain was re-created, `ResetWindowProc` dropped
+  the game's window procedure and `HookWindowProc` stored the subclass as the original, so `D3D9WindowProc` and
+  the subclass called each other until the stack ran out. DXVK now stays in such a chain.
+* **Crash log** — on a stack overflow `Div2Fix.log` also gets the return addresses on the whole stack per module,
+  the innermost and the most frequent game return addresses, and the address-space state.
+* Development parts (frame census 0009, GPU timers 0013, F11 debug views 0015) are in the DLL but off in
+  `dxvk.conf`; 0010–0012 are built on top of 0009.
 
 ### New in 1.4.2
 
@@ -121,6 +151,7 @@ outside the game folder (it reads `Div2Fix.ini`, `Div2Fix_mindread.txt`, `..\lan
 | `profiler.c` | optional diagnostics: sampling profiler of the render thread in long frames (`Div2Fix_prof_*`) |
 | `parcopy.c` | parallel copy of large new texture levels (`[Textures] ParallelCopyThreads`) |
 | `crashguard.c` | FSMaterial crash guard, crash log (`[General] FSMaterialGuard`, `CrashLog`) |
+| `overlay.c` | archive overlay: registers `Data\Win32\Packed\Reborn\*.dv2` before the patch slots (`[Overlay]`) |
 | `detour.c` | minimal x86 function detour used for D3D9 device methods |
 
 ## Build
@@ -131,7 +162,8 @@ outside the game folder (it reads `Div2Fix.ini`, `Div2Fix_mindread.txt`, `..\lan
 Output: `div2fix/build/dinput8.dll`. See `CHECKSUMS.txt` for the hashes of the released files.
 
 **DXVK** (`dxvk/`): DXVK v3.1.1 + `dxvk/patches/*.patch`, built with MSYS2 MINGW32 by `dxvk/build_dxvk.sh`
-(instructions at the top of the script). The patches only add options that are off by default:
+(instructions at the top of the script; the patches are applied in name order). Except 0014 (a bug fix) the
+patches only add options that are off by default:
 
 | Patch | Option | Shipped |
 |---|---|---|
@@ -141,12 +173,29 @@ Output: `div2fix/build/dinput8.dll`. See `CHECKSUMS.txt` for the hashes of the r
 | `0004-d3d9-stagingMemoryPerSubmission` | staging memory budget per submission (MB) | **32** |
 | `0005-d3d9-parallelManagedUpload` | pack large managed levels with worker threads (with 0003) | **4** |
 | `0006-d3d9-deferUnmappableRelease` | close freed memory-file mappings on a background thread | **on** |
+| `0009-d3d9-frameCensus` | development report of one frame (draws, shaders, targets) on a key; shader naming used by 0010–0012 | off |
+| `0010-d3d9-shaderOverride` | create a shader from `<folder>/<SHA-1 of the original>.dxso` instead | **`Div2Reborn_override\far`** |
+| `0011-d3d9-postAA` | SMAA after the engine's tonemap draw, before the interface (`d3d9.postAA`, `postAAKey`) | **on, F11** |
+| `0012-d3d9-postTAA` | TAA after SMAA | **on** |
+| `0013-d3d9-gpuTimers` | GPU time of the light pre-pass and post AA in the log | off |
+| `0014-d3d9-windowProcChain` | bug fix: keep the window-procedure chain when another subclass sits on top of DXVK's | always |
+| `0015-d3d9-postAADebugViews` | the F11 key also cycles development views (edges, weights, shadow cascades, ...) | off |
+
+**Shaders** (`shaders/`, needs Python 3 and the system `d3dcompiler_47.dll`):
+`py -3 tools/shaders/build_overrides.py <game>\Data\Win32\Packed shaders out` → `out/far/*.dxso` (reads the original
+shaders from the game's `MainDataStartup.dv2` to check the constant layout; nothing is written to the game) and
+`py -3 tools/shaders/build_post.py shaders out-post` → SMAA/TAA passes and lookup textures. Both give the shipped files
+byte for byte.
 
 ## Third-party files in the release
 
 * `bin/d3d9.dll` — **altered** DXVK 3.1.1 (zlib license): official source + the patches in `dxvk/patches`.
-  Not the official DXVK release. With all the options above off it behaves like official 3.1.1;
-  the official `x32/d3d9.dll` can also be used instead (then remove those lines from `dxvk.conf`).
+  Not the official DXVK release. With all the options above off it behaves like official 3.1.1 apart from the
+  window fix 0014; the official `x32/d3d9.dll` can also be used instead (then remove those lines from `dxvk.conf`;
+  the lighting fix, SMAA and TAA are then gone).
+* `bin/Div2Reborn_post/` — built from **[SMAA](https://github.com/iryoku/smaa)** (Jimenez et al., MIT;
+  `shaders/third_party/smaa`).
+* `Data/Win32/Packed/Reborn/Reborn_FX.dv2` — effect textures of the game (© Larian Studios), upscaled.
 * `res/div2.ico` — the game's own icon (© Larian Studios), used as the window icon.
 
 ## Credits
@@ -154,6 +203,7 @@ Output: `div2fix/build/dinput8.dll`. See `CHECKSUMS.txt` for the hashes of the r
 * **Larian Studios** — Divinity II and all original assets.
 * **[Div2Patch](https://github.com/BlanknameES/Div2Patch)** by BlanknameES — required, not included.
 * **[DXVK](https://github.com/doitsujin/dxvk)** by Philip Rebohle and contributors — shipped with small patches (`dxvk/`).
+* **[SMAA](https://github.com/iryoku/smaa)** by Jorge Jimenez, Jose I. Echevarria, Belen Masia, Fernando Navarro and Diego Gutierrez (MIT).
 * **4x-UltraSharp** by Kim2091 (CC BY-NC-SA 4.0), run with Real-ESRGAN-ncnn-vulkan — used to upscale the textures.
 
 ## License

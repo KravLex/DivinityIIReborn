@@ -1,0 +1,381 @@
+diff --git a/src/d3d9/d3d9_device.cpp b/src/d3d9/d3d9_device.cpp
+index 67de2dd..1466853 100644
+--- a/src/d3d9/d3d9_device.cpp
++++ b/src/d3d9/d3d9_device.cpp
+@@ -84,6 +84,9 @@ namespace dxvk {
+     if (m_d3d9Options.postAA)
+       m_postAA = std::make_unique<D3D9PostAA>(this, m_d3d9Options);
+ 
++    if (m_d3d9Options.gpuTimers)
++      m_gpuTimers = std::make_unique<D3D9GpuTimers>(this, m_d3d9Options.gpuTimersReportSeconds);
++
+     if (m_dxvkDevice->debugFlags().test(DxvkDebugFlag::Markers))
+       m_annotation = new D3D9UserDefinedAnnotation(this);
+ 
+@@ -184,6 +187,7 @@ namespace dxvk {
+ 
+     // Divinity II Reborn post AA: release its private resources while the device is complete
+     m_postAA = nullptr;
++    m_gpuTimers = nullptr;
+ 
+     if (m_annotation)
+       delete m_annotation;
+diff --git a/src/d3d9/d3d9_device.h b/src/d3d9/d3d9_device.h
+index e450da5..cc3ff8c 100644
+--- a/src/d3d9/d3d9_device.h
++++ b/src/d3d9/d3d9_device.h
+@@ -24,6 +24,7 @@
+ #include "d3d9_frame_census.h"
+ #include "d3d9_shader_override.h"
+ #include "d3d9_post_aa.h"
++#include "d3d9_gpu_timers.h"
+ 
+ #include <cstdint>
+ #include <memory>
+@@ -1491,6 +1492,9 @@ namespace dxvk {
+     void OnCensusPresent() {
+       RunPendingPostAA();
+ 
++      if (unlikely(m_gpuTimers != nullptr))
++        m_gpuTimers->OnPresent();
++
+       if (unlikely(m_postAA != nullptr))
+         m_postAA->OnPresent();
+ 
+@@ -1505,8 +1509,15 @@ namespace dxvk {
+      * Has to be externally synchronized.
+      */
+     void RunPendingPostAA() {
+-      if (unlikely(m_postAA != nullptr && m_postAA->IsPending()))
++      if (unlikely(m_postAA != nullptr && m_postAA->IsPending())) {
++        if (unlikely(m_gpuTimers != nullptr))
++          m_gpuTimers->Begin(D3D9GpuTimers::SectionPost);
++
+         m_postAA->Run();
++
++        if (unlikely(m_gpuTimers != nullptr))
++          m_gpuTimers->End(D3D9GpuTimers::SectionPost);
++      }
+     }
+ 
+     /**
+@@ -1529,6 +1540,9 @@ namespace dxvk {
+         m_postAA->NoteGBuffer(m_state.textures[0]);
+         SetPostFrameNoise(m_postAA->FrameNoise(), m_postAA->ShadowDebug());
+ 
++        if (unlikely(m_gpuTimers != nullptr))
++          m_gpuTimers->Begin(D3D9GpuTimers::SectionLight);
++
+         int32_t viewMat = m_state.pixelShader->GetPostViewMatRegister();
+ 
+         if (viewMat >= 0 && m_postAA->WantsCamera()) {
+@@ -1705,6 +1719,7 @@ namespace dxvk {
+     std::unique_ptr<D3D9FrameCensus> m_census;
+     std::unique_ptr<D3D9ShaderOverride> m_shaderOverride;
+     std::unique_ptr<D3D9PostAA>      m_postAA;
++    std::unique_ptr<D3D9GpuTimers>   m_gpuTimers;                        // d3d9.gpuTimers
+     float                            m_postJitter[2] = { 0.0f, 0.0f };   // TAA: viewport offset in pixels
+     bool                             m_postNoiseSet = false;             // c39 holds the frame noise for this draw
+     Vector4                          m_postNoiseSaved;                   // the application's c39
+@@ -1727,18 +1742,30 @@ namespace dxvk {
+   public:
+ 
+     void RestorePostFrameNoise() {
++      if (unlikely(m_gpuTimers != nullptr))
++        m_gpuTimers->End(D3D9GpuTimers::SectionLight);
++
+       if (likely(!m_postNoiseSet))
+         return;
+       m_postNoiseSet = false;
+       SetPixelShaderConstantF(PostFrameNoiseRegister, m_postNoiseSaved.data, 1);
+     }
+ 
+-    /// Restores c39 when a draw call returns
++    /// Restores c39 (and closes the light pre-pass GPU timer) when a draw call returns
+     struct PostFrameNoiseGuard {
+       D3D9DeviceEx* device;
+       ~PostFrameNoiseGuard() { device->RestorePostFrameNoise(); }
+     };
+ 
++    /**
++     * \brief Records a GPU timestamp into \p Query (D3D9GpuTimers)
++     */
++    void EmitGpuTimestamp(const Rc<DxvkQuery>& Query) {
++      EmitCs([cQuery = Query] (DxvkContext* ctx) {
++        ctx->writeTimestamp(cQuery);
++      });
++    }
++
+   private:
+ 
+     /**
+diff --git a/src/d3d9/d3d9_gpu_timers.cpp b/src/d3d9/d3d9_gpu_timers.cpp
+new file mode 100644
+index 0000000..addebf1
+--- /dev/null
++++ b/src/d3d9/d3d9_gpu_timers.cpp
+@@ -0,0 +1,140 @@
++#include "d3d9_gpu_timers.h"
++
++#include "d3d9_device.h"
++
++#include "../util/log/log.h"
++#include "../util/util_string.h"
++
++#include <algorithm>
++#include <cstdio>
++
++namespace dxvk {
++
++  static constexpr size_t   MaxPending    = 4096u;   // results that never arrive (device lost etc.): start over
++
++  static const char* const SectionNames[D3D9GpuTimers::SectionCount] = {
++    "light pre-pass (shadows, AO)", "post AA (SMAA + TAA)" };
++
++
++  D3D9GpuTimers::D3D9GpuTimers(D3D9DeviceEx* pDevice, float ReportSeconds)
++  : m_device(pDevice), m_reportSeconds(std::max(double(ReportSeconds), 0.0)) {
++    const auto& limits = pDevice->GetDXVKDevice()->properties().core.properties.limits;
++    m_nsPerTick = double(limits.timestampPeriod);
++    m_windowStart = std::chrono::high_resolution_clock::now();
++    Logger::info(str::format("D3D9 GPU timers: on, ", limits.timestampPeriod, " ns per tick, report every ",
++      m_reportSeconds, " s"));
++  }
++
++
++  D3D9GpuTimers::~D3D9GpuTimers() {
++    Collect();
++
++    if (m_frames) {
++      double seconds = std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - m_windowStart).count();
++      Report(seconds, " (last part, at exit: results still on the GPU are left out)");
++    }
++  }
++
++
++  void D3D9GpuTimers::Begin(Section Which) {
++    if (m_open[Which])
++      return;
++    m_open[Which] = true;
++    Stamp_(Which, false);
++  }
++
++
++  void D3D9GpuTimers::End(Section Which) {
++    if (!m_open[Which])
++      return;
++    m_open[Which] = false;
++    Stamp_(Which, true);
++  }
++
++
++  void D3D9GpuTimers::Stamp_(Section Which, bool End) {
++    // a fresh query each time: a reused one keeps reporting its old result until the CS thread writes it again
++    Rc<DxvkQuery> query = m_device->GetDXVKDevice()->createGpuQuery(VK_QUERY_TYPE_TIMESTAMP, 0, 0);
++    m_device->EmitGpuTimestamp(query);
++    m_pending.push_back({ std::move(query), uint32_t(Which), End });
++  }
++
++
++  void D3D9GpuTimers::Collect() {
++    while (!m_pending.empty()) {
++      DxvkQueryData data = { };
++      DxvkGpuQueryStatus status = m_pending.front().query->getData(data);
++
++      if (status == DxvkGpuQueryStatus::Pending || status == DxvkGpuQueryStatus::Invalid)
++        break;   // Invalid: not written by the CS thread yet
++
++      Stamp stamp = std::move(m_pending.front());
++      m_pending.pop_front();
++
++      if (status != DxvkGpuQueryStatus::Available) {
++        m_haveBegin[stamp.section] = false;
++        continue;
++      }
++
++      if (!stamp.end) {
++        m_begin[stamp.section] = data.timestamp.time;
++        m_haveBegin[stamp.section] = true;
++      } else if (m_haveBegin[stamp.section]) {
++        if (data.timestamp.time >= m_begin[stamp.section]) {
++          m_sumNs[stamp.section] += double(data.timestamp.time - m_begin[stamp.section]) * m_nsPerTick;
++          m_intervals[stamp.section] += 1u;
++        }
++        m_haveBegin[stamp.section] = false;
++      }
++    }
++
++    if (m_pending.size() > MaxPending) {
++      Logger::warn("D3D9 GPU timers: results do not arrive, starting over");
++      m_pending.clear();
++      for (uint32_t i = 0; i < SectionCount; i++)
++        m_haveBegin[i] = false;
++    }
++  }
++
++
++  void D3D9GpuTimers::OnPresent() {
++    for (uint32_t i = 0; i < SectionCount; i++)
++      End(Section(i));
++
++    Collect();
++    m_frames += 1u;
++
++    auto now = std::chrono::high_resolution_clock::now();
++    double seconds = std::chrono::duration<double>(now - m_windowStart).count();
++
++    if (seconds < m_reportSeconds)
++      return;
++
++    Report(seconds, "");
++    m_windowStart = now;
++  }
++
++
++  void D3D9GpuTimers::Report(double Seconds, const char* pWhen) {
++    char line[640];
++    int n = std::snprintf(line, sizeof(line), "D3D9 GPU timers%s: %.1f s, %u frames, %.1f FPS (%.2f ms):",
++      pWhen, Seconds, m_frames, double(m_frames) / Seconds, 1000.0 * Seconds / double(std::max(m_frames, 1u)));
++
++    for (uint32_t i = 0; i < SectionCount && n > 0 && n < int(sizeof(line)); i++) {
++      n += std::snprintf(line + n, sizeof(line) - size_t(n), "%s %s %.3f ms/frame (%.1f per frame)",
++        i ? "," : "", SectionNames[i], m_sumNs[i] * 1e-6 / double(std::max(m_frames, 1u)),
++        double(m_intervals[i]) / double(std::max(m_frames, 1u)));
++    }
++
++    Logger::info(line);
++
++    m_reports += 1u;
++    m_frames = 0u;
++
++    for (uint32_t i = 0; i < SectionCount; i++) {
++      m_sumNs[i] = 0.0;
++      m_intervals[i] = 0u;
++    }
++  }
++
++}
+diff --git a/src/d3d9/d3d9_gpu_timers.h b/src/d3d9/d3d9_gpu_timers.h
+new file mode 100644
+index 0000000..724f1f4
+--- /dev/null
++++ b/src/d3d9/d3d9_gpu_timers.h
+@@ -0,0 +1,77 @@
++#pragma once
++
++#include "../dxvk/dxvk_device.h"
++
++#include <chrono>
++#include <cstdint>
++#include <deque>
++
++namespace dxvk {
++
++  class D3D9DeviceEx;
++
++  /**
++   * \brief Divinity II Reborn GPU timers (d3d9.gpuTimers, development builds)
++   *
++   * GPU timestamps around the light pre-pass draws that read the depth + normal buffer (the replaced sun and
++   * hemisphere passes: shadows and AO) and around the post AA passes (SMAA and TAA). Every few seconds the
++   * average GPU time per frame of each, and the frame rate, go to the log. Results are read back a few frames
++   * later without waiting for the GPU.
++   */
++  class D3D9GpuTimers {
++
++  public:
++
++    enum Section : uint32_t {
++      SectionLight = 0,   // light pre-pass draws with a G-buffer reader shader
++      SectionPost  = 1,   // SMAA + TAA
++      SectionCount = 2
++    };
++
++    D3D9GpuTimers(D3D9DeviceEx* pDevice, float ReportSeconds);
++
++    ~D3D9GpuTimers();
++
++    void Begin(Section Which);
++
++    void End(Section Which);
++
++    bool IsOpen(Section Which) const {
++      return m_open[Which];
++    }
++
++    /**
++     * \brief Frame boundary (before present): reads back finished timestamps, logs every few seconds
++     */
++    void OnPresent();
++
++  private:
++
++    struct Stamp {
++      Rc<DxvkQuery> query;
++      uint32_t      section;
++      bool          end;
++    };
++
++    D3D9DeviceEx*     m_device;
++    double            m_nsPerTick;
++    double            m_reportSeconds;
++    std::deque<Stamp> m_pending;
++    bool              m_open[SectionCount]     = { };
++    bool              m_haveBegin[SectionCount] = { };
++    uint64_t          m_begin[SectionCount]     = { };
++    double            m_sumNs[SectionCount]     = { };
++    uint32_t          m_intervals[SectionCount] = { };
++    uint32_t          m_frames                  = 0u;
++    uint32_t          m_reports                 = 0u;
++    std::chrono::high_resolution_clock::time_point m_windowStart;
++
++    void Stamp_(Section Which, bool End);
++
++    void Collect();
++
++    void Report(double Seconds, const char* pWhen);
++
++  };
++
++}
+diff --git a/src/d3d9/d3d9_options.cpp b/src/d3d9/d3d9_options.cpp
+index c9e2865..7ea2190 100644
+--- a/src/d3d9/d3d9_options.cpp
++++ b/src/d3d9/d3d9_options.cpp
+@@ -94,6 +94,8 @@ namespace dxvk {
+     this->postAAKey                     = config.getOption<int32_t>     ("d3d9.postAAKey",                     0x2D);   // Insert
+     this->postAAGBufferShaders          = config.getOption<std::string> ("d3d9.postAAGBufferShaders",          "");
+     this->postTAA                       = config.getOption<bool>        ("d3d9.postTAA",                       false);
++    this->gpuTimers                     = config.getOption<bool>        ("d3d9.gpuTimers",                     false);
++    this->gpuTimersReportSeconds        = config.getOption<float>       ("d3d9.gpuTimersReportSeconds",        5.0f);
+ 
+     if (this->postAAGBufferShaders.empty()) {
+       // div2_PreLightPass Sun_..._VSM_Char, Sun_..._VSM_Char_Terrain (ViewMat c24, EyePosition c28),
+diff --git a/src/d3d9/d3d9_options.h b/src/d3d9/d3d9_options.h
+index e348b33..788dd0a 100644
+--- a/src/d3d9/d3d9_options.h
++++ b/src/d3d9/d3d9_options.h
+@@ -218,6 +218,11 @@ namespace dxvk {
+     /// the scene and accumulation of the frames, reprojected with the engine's depth buffer
+     bool postTAA;
+ 
++    /// Divinity II Reborn GPU timers: average GPU time per frame of the light pre-pass draws that read the
++    /// depth + normal buffer and of the post AA passes, written to the log every 5 seconds (development)
++    bool gpuTimers;
++    float gpuTimersReportSeconds;
++
+     /// Shader dump path
+     std::string shaderDumpPath;
+ 
+diff --git a/src/d3d9/meson.build b/src/d3d9/meson.build
+index edb57f2..e91a770 100644
+--- a/src/d3d9/meson.build
++++ b/src/d3d9/meson.build
+@@ -43,6 +43,7 @@ d3d9_src = [
+   'd3d9_frame_census.cpp',
+   'd3d9_shader_override.cpp',
+   'd3d9_post_aa.cpp',
++  'd3d9_gpu_timers.cpp',
+   'd3d9_fixed_function.cpp',
+   'd3d9_names.cpp',
+   'd3d9_swvp_emu.cpp',

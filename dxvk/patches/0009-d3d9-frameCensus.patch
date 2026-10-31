@@ -1,0 +1,813 @@
+diff --git a/src/d3d9/d3d9_device.cpp b/src/d3d9/d3d9_device.cpp
+index b14ebd4..829e196 100644
+--- a/src/d3d9/d3d9_device.cpp
++++ b/src/d3d9/d3d9_device.cpp
+@@ -75,6 +75,9 @@ namespace dxvk {
+     if (canSWVP)
+       Logger::info("D3D9DeviceEx: Using extended constant set for software vertex processing.");
+ 
++    if (m_d3d9Options.frameCensus)
++      m_census = std::make_unique<D3D9FrameCensus>(m_d3d9Options);
++
+     if (m_dxvkDevice->debugFlags().test(DxvkDebugFlag::Markers))
+       m_annotation = new D3D9UserDefinedAnnotation(this);
+ 
+@@ -1234,6 +1237,9 @@ namespace dxvk {
+     if (unlikely(src == dst))
+       return D3DERR_INVALIDCALL;
+ 
++    if (unlikely(m_census != nullptr && m_census->IsCapturing()))
++      m_census->OnStretchRect(src, dst, Filter);
++
+     bool fastPath = true;
+ 
+     D3D9CommonTexture* dstTextureInfo = dst->GetCommonTexture();
+@@ -1910,6 +1916,10 @@ namespace dxvk {
+       return D3D_OK;
+ 
+     D3D9DeviceLock lock = LockDevice();
++
++    if (unlikely(m_census != nullptr && m_census->IsCapturing()))
++      m_census->OnClear(m_state, Flags, Color, Z, Count);
++
+     BindFramebuffer();
+ 
+     // D3DCLEAR_ZBUFFER and D3DCLEAR_STENCIL are invalid flags
+@@ -3039,6 +3049,9 @@ namespace dxvk {
+     if (unlikely(!PrimitiveCount))
+       return D3D_OK;
+ 
++    if (unlikely(m_census != nullptr && m_census->IsCapturing()))
++      m_census->OnDraw(m_state, "DP", PrimitiveCount);
++
+     bool dynamicSysmemVBOs = false;
+ 
+     uint32_t firstIndex     = 0;
+@@ -3091,6 +3104,9 @@ namespace dxvk {
+     if (unlikely(!PrimitiveCount || !NumVertices))
+       return D3D_OK;
+ 
++    if (unlikely(m_census != nullptr && m_census->IsCapturing()))
++      m_census->OnDraw(m_state, "DIP", PrimitiveCount);
++
+     bool dynamicSysmemVBOs = false;
+     bool dynamicSysmemIBO = false;
+ 
+@@ -3155,6 +3171,9 @@ namespace dxvk {
+     if (unlikely(!PrimitiveCount))
+       return D3D_OK;
+ 
++    if (unlikely(m_census != nullptr && m_census->IsCapturing()))
++      m_census->OnDraw(m_state, "DPUP", PrimitiveCount);
++
+     PrepareDraw(PrimitiveType, false, false);
+ 
+     uint32_t vertexCount = GetVertexCount(PrimitiveType, PrimitiveCount);
+@@ -3209,6 +3228,9 @@ namespace dxvk {
+     if (unlikely(!PrimitiveCount || !NumVertices))
+       return D3D_OK;
+ 
++    if (unlikely(m_census != nullptr && m_census->IsCapturing()))
++      m_census->OnDraw(m_state, "DIPUP", PrimitiveCount);
++
+     PrepareDraw(PrimitiveType, false, false);
+ 
+     uint32_t vertexCount = GetVertexCount(PrimitiveType, PrimitiveCount);
+@@ -3545,11 +3567,16 @@ namespace dxvk {
+       pFunction)))
+       return D3DERR_INVALIDCALL;
+ 
+-    *ppShader = ref(new D3D9VertexShader(this,
++    auto* shader = new D3D9VertexShader(this,
+       &m_shaderAllocator,
+       module,
+       pFunction,
+-      uint32_t(bytecodeLength)));
++      uint32_t(bytecodeLength));
++
++    if (unlikely(m_census != nullptr))
++      shader->SetCensusId(m_census->NameShader(pFunction, bytecodeLength, false));
++
++    *ppShader = ref(shader);
+ 
+     return D3D_OK;
+   }
+@@ -3903,11 +3930,16 @@ namespace dxvk {
+       pFunction)))
+       return D3DERR_INVALIDCALL;
+ 
+-    *ppShader = ref(new D3D9PixelShader(this,
++    auto* shader = new D3D9PixelShader(this,
+       &m_shaderAllocator,
+       module,
+       pFunction,
+-      uint32_t(bytecodeLength)));
++      uint32_t(bytecodeLength));
++
++    if (unlikely(m_census != nullptr))
++      shader->SetCensusId(m_census->NameShader(pFunction, bytecodeLength, true));
++
++    *ppShader = ref(shader);
+ 
+     return D3D_OK;
+   }
+diff --git a/src/d3d9/d3d9_device.h b/src/d3d9/d3d9_device.h
+index 83d72c2..dbc8088 100644
+--- a/src/d3d9/d3d9_device.h
++++ b/src/d3d9/d3d9_device.h
+@@ -21,8 +21,10 @@
+ 
+ #include "d3d9_interop.h"
+ #include "d3d9_on_12.h"
++#include "d3d9_frame_census.h"
+ 
+ #include <cstdint>
++#include <memory>
+ #include <unordered_set>
+ #include "d3d9_bridge.h"
+ 
+@@ -1478,6 +1480,17 @@ namespace dxvk {
+       m_mostRecentlyUsedSwapchain = swapchain;
+     }
+ 
++    /**
++     * \brief Frame boundary for the Divinity II Reborn frame census
++     *
++     * Called by the swap chain before presenting.
++     * Has to be externally synchronized.
++     */
++    void OnCensusPresent() {
++      if (unlikely(m_census != nullptr))
++        m_census->OnPresent();
++    }
++
+     /**
+      * @brief Reset the most recently swapchain back to the implicit one
+      * Has to be externally synchronized.
+@@ -1637,6 +1650,8 @@ namespace dxvk {
+     bool                            m_inScene          = false;
+     bool                            m_validSampleMask  = false;
+ 
++    std::unique_ptr<D3D9FrameCensus> m_census;
++
+     VkImageLayout                   m_hazardLayout = VK_IMAGE_LAYOUT_GENERAL;
+ 
+     uint32_t                        m_resetCtr = 0u;
+diff --git a/src/d3d9/d3d9_frame_census.cpp b/src/d3d9/d3d9_frame_census.cpp
+new file mode 100644
+index 0000000..8826214
+--- /dev/null
++++ b/src/d3d9/d3d9_frame_census.cpp
+@@ -0,0 +1,426 @@
++#include "d3d9_frame_census.h"
++
++#include "d3d9_options.h"
++#include "d3d9_shader.h"
++#include "d3d9_surface.h"
++#include "d3d9_texture.h"
++
++#include "../util/log/log.h"
++#include "../util/sha1/sha1_util.h"
++#include "../util/util_env.h"
++#include "../util/util_string.h"
++
++#include <cstdio>
++#include <ctime>
++#include <fstream>
++#include <sstream>
++
++namespace dxvk {
++
++  static std::string FormatName(D3D9Format Format) {
++    switch (uint32_t(Format)) {
++      case 0:   return "NULL";
++      case 20:  return "R8G8B8";
++      case 21:  return "A8R8G8B8";
++      case 22:  return "X8R8G8B8";
++      case 23:  return "R5G6B5";
++      case 31:  return "A2B10G10R10";
++      case 32:  return "A8B8G8R8";
++      case 34:  return "G16R16";
++      case 35:  return "A2R10G10B10";
++      case 36:  return "A16B16G16R16";
++      case 50:  return "L8";
++      case 71:  return "D16_LOCKABLE";
++      case 75:  return "D24S8";
++      case 77:  return "D24X8";
++      case 80:  return "D16";
++      case 82:  return "D32F_LOCKABLE";
++      case 111: return "R16F";
++      case 112: return "G16R16F";
++      case 113: return "A16B16G16R16F";
++      case 114: return "R32F";
++      case 115: return "G32R32F";
++      case 116: return "A32B32G32R32F";
++    }
++
++    uint32_t v = uint32_t(Format);
++    char fourcc[5] = { char(v), char(v >> 8), char(v >> 16), char(v >> 24), 0 };
++    bool printable = v > 0xFFu;
++
++    for (uint32_t i = 0; i < 4 && printable; i++)
++      printable = fourcc[i] >= 0x20 && fourcc[i] < 0x7F;
++
++    return printable ? std::string(fourcc) : str::format("fmt", v);
++  }
++
++
++  bool D3D9FrameCensus::DrawKey::operator == (const DrawKey& other) const {
++    for (uint32_t i = 0; i < caps::MaxSimultaneousRenderTargets; i++) {
++      if (rt[i] != other.rt[i])
++        return false;
++    }
++
++    return ds == other.ds && vs == other.vs && ps == other.ps
++        && sampled == other.sampled && otherTextures == other.otherTextures;
++  }
++
++
++  D3D9FrameCensus::D3D9FrameCensus(const D3D9Options& Options)
++  : m_key             (Options.frameCensusKey),
++    m_framesToCapture (std::max(1, std::min(Options.frameCensusFrames, 8))),
++    m_autoFrame       (uint32_t(std::max(0, Options.frameCensusAtFrame))) {
++    std::string exe = env::getExePath();
++    auto n = exe.find_last_of("\\/");
++    m_dir = n != std::string::npos ? exe.substr(0, n + 1) : std::string();
++
++    std::string table = Options.frameCensusShaderNames;
++    bool absolute = table.size() > 1 && (table[1] == ':' || table[0] == '\\' || table[0] == '/');
++    LoadTable(absolute ? table : m_dir + table);
++
++    Logger::info(str::format("D3D9 frame census: armed, key VK ", m_key, ", frames ", m_framesToCapture,
++      m_autoFrame ? str::format(", auto at frame ", m_autoFrame) : std::string(), ", ", m_table.size(), " shader names"));
++  }
++
++
++  void D3D9FrameCensus::LoadTable(const std::string& path) {
++    std::ifstream file(str::topath(path.c_str()).c_str());
++
++    if (!file) {
++      Logger::warn(str::format("D3D9 frame census: shader name table not found: ", path));
++      return;
++    }
++
++    std::unordered_map<std::string, uint32_t> shared;
++    std::string line;
++
++    while (std::getline(file, line)) {
++      if (line.empty() || line[0] == '#')
++        continue;
++
++      std::istringstream fields(line);
++      std::string sha1, stage, effect, technique, pass;
++
++      if (!(fields >> sha1 >> stage >> effect >> technique >> pass))
++        continue;
++
++      std::string name = effect + "/" + technique + (pass != "-" ? "/" + pass : std::string());
++      auto entry = m_table.find(sha1);
++
++      // The same bytecode can be shared by several techniques (e.g. full-screen
++      // vertex shaders): keep the first name and count the others
++      if (entry == m_table.end())
++        m_table.emplace(sha1, name);
++      else
++        shared[sha1] += 1u;
++    }
++
++    for (const auto& s : shared)
++      m_table[s.first] += str::format("(+", s.second, ")");
++  }
++
++
++  uint32_t D3D9FrameCensus::NameShader(const void* pBytecode, size_t Length, bool Pixel) {
++    std::string sha1 = Sha1Hash::compute(pBytecode, Length).toString();
++    auto entry = m_shaderIds.find(sha1);
++
++    if (entry != m_shaderIds.end())
++      return entry->second;
++
++    auto name = m_table.find(sha1);
++
++    ShaderInfo info;
++    info.sha1  = sha1;
++    info.name  = name != m_table.end() ? name->second : std::string();
++    info.pixel = Pixel;
++
++    m_shaders.push_back(std::move(info));
++    uint32_t id = uint32_t(m_shaders.size());
++    m_shaderIds.emplace(sha1, id);
++    return id;
++  }
++
++
++  std::string D3D9FrameCensus::ShaderName(uint32_t Id) const {
++    if (!Id)
++      return "FF";
++
++    const ShaderInfo& info = m_shaders.at(Id - 1);
++    return info.name.empty()
++      ? str::format("?", info.sha1.substr(0, 12))
++      : info.name;
++  }
++
++
++  uint32_t D3D9FrameCensus::ResourceId(D3D9CommonTexture* pTexture, D3D9Surface* pSurface) {
++    if (pTexture == nullptr)
++      return 0u;
++
++    auto entry = m_resourceIds.find(pTexture);
++
++    if (entry != m_resourceIds.end())
++      return entry->second;
++
++    const D3D9_COMMON_TEXTURE_DESC* desc = pTexture->Desc();
++
++    std::string kind = desc->IsBackBuffer ? "backbuffer"
++      : (desc->Usage & D3DUSAGE_DEPTHSTENCIL) ? "depth"
++      : (desc->Usage & D3DUSAGE_RENDERTARGET) ? "rendertarget"
++      : "texture";
++
++    bool sampleable = pSurface == nullptr || pSurface->GetBaseTexture() != nullptr;
++
++    ResourceInfo info;
++    info.desc = str::format(kind, " ", desc->Width, "x", desc->Height,
++      desc->ArraySize > 1 ? str::format(" layers=", desc->ArraySize) : std::string(),
++      " ", FormatName(desc->Format),
++      " mips=", desc->MipLevels,
++      desc->MultiSample ? str::format(" msaa=", uint32_t(desc->MultiSample)) : std::string(),
++      sampleable ? " sampleable" : " surface-only");
++
++    m_resources.push_back(std::move(info));
++    uint32_t id = uint32_t(m_resources.size());
++    m_resourceIds.emplace(pTexture, id);
++    return id;
++  }
++
++
++  D3D9FrameCensus::DrawKey D3D9FrameCensus::MakeKey(Direct3DState9& State) {
++    DrawKey key;
++
++    for (uint32_t i = 0; i < caps::MaxSimultaneousRenderTargets; i++) {
++      D3D9Surface* rt = State.renderTargets[i].ptr();
++      key.rt[i] = rt != nullptr ? ResourceId(rt->GetCommonTexture(), rt) : 0u;
++    }
++
++    D3D9Surface* ds = State.depthStencil.ptr();
++    key.ds = ds != nullptr ? ResourceId(ds->GetCommonTexture(), ds) : 0u;
++
++    key.vs = State.vertexShader != nullptr ? State.vertexShader->GetCensusId() : 0u;
++    key.ps = State.pixelShader  != nullptr ? State.pixelShader->GetCensusId()  : 0u;
++
++    for (uint32_t i = 0; i < SamplerCount; i++) {
++      IDirect3DBaseTexture9* texture = State.textures[i];
++
++      if (texture == nullptr)
++        continue;
++
++      D3D9CommonTexture* common = GetCommonTexture(texture);
++
++      if (common->Desc()->Usage & (D3DUSAGE_RENDERTARGET | D3DUSAGE_DEPTHSTENCIL))
++        key.sampled.emplace_back(i, ResourceId(common, nullptr));
++      else
++        key.otherTextures += 1u;
++    }
++
++    return key;
++  }
++
++
++  void D3D9FrameCensus::OnDraw(Direct3DState9& State, const char* pKind, uint32_t PrimitiveCount) {
++    DrawKey key = MakeKey(State);
++
++    // First draw of each named pixel shader in the capture: keep c0-c15, the values the
++    // engine feeds to the pass (needed to rewrite engine shaders, e.g. the tonemap)
++    if (key.ps && !m_shaders[key.ps - 1].name.empty() && m_psConstants.find(key.ps) == m_psConstants.end()) {
++      std::string consts;
++
++      for (uint32_t i = 0; i < 16u; i++) {
++        const auto& c = State.psConsts->fConsts[i];
++        consts += str::format(i ? " " : "", "c", i, "=(", c.x, ",", c.y, ",", c.z, ",", c.w, ")");
++      }
++
++      m_psConstants.emplace(key.ps, std::move(consts));
++    }
++
++    if (!m_events.empty()) {
++      Event& last = m_events.back();
++
++      if (last.text.empty() && last.frame == m_captureFrame && last.kind == pKind && last.key == key) {
++        last.draws += 1u;
++        last.prims += PrimitiveCount;
++        return;
++      }
++    }
++
++    for (uint32_t i = 0; i < caps::MaxSimultaneousRenderTargets; i++) {
++      if (key.rt[i])
++        m_resources[key.rt[i] - 1].writes += 1u;
++    }
++
++    for (const auto& s : key.sampled)
++      m_resources[s.second - 1].reads += 1u;
++
++    Event e;
++    e.key   = std::move(key);
++    e.kind  = pKind;
++    e.frame = m_captureFrame;
++    e.draws = 1u;
++    e.prims = PrimitiveCount;
++    m_events.push_back(std::move(e));
++  }
++
++
++  void D3D9FrameCensus::OnClear(Direct3DState9& State, DWORD Flags, D3DCOLOR Color, float Z, DWORD RectCount) {
++    char color[16] = { };
++    std::snprintf(color, sizeof(color), "%08x", unsigned(Color));
++
++    Event e;
++    e.key   = MakeKey(State);
++    e.kind  = "Clear";
++    e.frame = m_captureFrame;
++    e.text  = str::format("Clear",
++      (Flags & D3DCLEAR_TARGET)  ? str::format(" color=0x", color) : std::string(),
++      (Flags & D3DCLEAR_ZBUFFER) ? str::format(" z=", Z) : std::string(),
++      (Flags & D3DCLEAR_STENCIL) ? " stencil" : "",
++      RectCount ? str::format(" rects=", RectCount) : std::string());
++    m_events.push_back(std::move(e));
++  }
++
++
++  void D3D9FrameCensus::OnStretchRect(D3D9Surface* pSrc, D3D9Surface* pDst, D3DTEXTUREFILTERTYPE Filter) {
++    uint32_t src = ResourceId(pSrc->GetCommonTexture(), pSrc);
++    uint32_t dst = ResourceId(pDst->GetCommonTexture(), pDst);
++    m_resources[src - 1].reads  += 1u;
++    m_resources[dst - 1].writes += 1u;
++
++    Event e;
++    e.kind  = "StretchRect";
++    e.frame = m_captureFrame;
++    e.text  = str::format("StretchRect R", src, " mip", pSrc->GetMipLevel(),
++      " -> R", dst, " mip", pDst->GetMipLevel(), " filter=", uint32_t(Filter));
++    m_events.push_back(std::move(e));
++  }
++
++
++  void D3D9FrameCensus::OnPresent() {
++    m_presentCount += 1u;
++
++    if (m_capturing) {
++      m_captureFrame += 1u;
++
++      if (--m_framesLeft == 0u) {
++        m_capturing = false;
++        Write();
++        m_events.clear();
++      }
++
++      return;
++    }
++
++    bool trigger = m_autoFrame != 0u && m_presentCount == m_autoFrame;
++
++    if (m_key > 0) {
++      bool down = (GetAsyncKeyState(m_key) & 0x8000) != 0;
++      trigger |= down && !m_keyDown;
++      m_keyDown = down;
++    }
++
++    if (trigger) {
++      m_capturing    = true;
++      m_framesLeft   = m_framesToCapture;
++      m_captureFrame = 0u;
++      m_firstFrame   = m_presentCount + 1u;
++      m_resourceIds.clear();
++      m_resources.clear();
++      m_psConstants.clear();
++      Logger::info(str::format("D3D9 frame census: capturing ", m_framesToCapture, " frame(s) from frame ", m_firstFrame));
++    }
++  }
++
++
++  std::string D3D9FrameCensus::FormatKey(const DrawKey& Key) const {
++    std::string rts;
++
++    for (uint32_t i = 0; i < caps::MaxSimultaneousRenderTargets; i++) {
++      if (Key.rt[i])
++        rts += str::format(rts.empty() ? "" : ",", "R", Key.rt[i]);
++    }
++
++    std::string sampled;
++
++    for (const auto& s : Key.sampled)
++      sampled += str::format(" s", s.first, "=R", s.second);
++
++    return str::format("RT=", rts.empty() ? std::string("-") : rts,
++      " DS=", Key.ds ? str::format("R", Key.ds) : std::string("-"),
++      " VS=", ShaderName(Key.vs), " PS=", ShaderName(Key.ps),
++      sampled.empty() ? std::string() : " reads" + sampled,
++      " tex=", Key.otherTextures);
++  }
++
++
++  void D3D9FrameCensus::Write() {
++    std::time_t now = std::time(nullptr);
++    char stamp[32] = { };
++    std::strftime(stamp, sizeof(stamp), "%Y%m%d_%H%M%S", std::localtime(&now));
++
++    std::string path = m_dir + "Div2Reborn_census_" + stamp + ".txt";
++    std::ofstream out(str::topath(path.c_str()).c_str());
++
++    if (!out) {
++      Logger::err(str::format("D3D9 frame census: cannot write ", path));
++      return;
++    }
++
++    uint32_t draws = 0u, segments = 0u, unknown = 0u;
++
++    for (const auto& e : m_events) {
++      if (e.text.empty()) {
++        draws    += e.draws;
++        segments += 1u;
++      }
++    }
++
++    out << "# Divinity II Reborn frame census (DXVK patch 0009). Diagnostic only, rendering unchanged.\n";
++    out << "# frames " << m_firstFrame << ".." << (m_firstFrame + m_framesToCapture - 1u)
++        << ", draws " << draws << " in " << segments << " segments, events " << m_events.size() << "\n";
++    out << "# segment: <frame>.<n> <kind> x<draws> prims=<n> RT=<targets> DS=<depth> VS/PS=<effect/technique/pass | ?sha1 | FF>"
++           " reads s<sampler>=R<id> (render targets sampled) tex=<other textures>\n\n";
++
++    out << "## Resources (render targets, depth buffers, sampled targets)\n";
++
++    for (uint32_t i = 0; i < m_resources.size(); i++) {
++      const ResourceInfo& r = m_resources[i];
++      out << "R" << (i + 1) << " " << r.desc << " writes=" << r.writes << " reads=" << r.reads << "\n";
++    }
++
++    out << "\n## Events\n";
++    uint32_t n = 0u, frame = ~0u;
++
++    for (const auto& e : m_events) {
++      if (e.frame != frame) {
++        frame = e.frame;
++        n = 0u;
++        out << "### frame " << (m_firstFrame + frame) << "\n";
++      }
++
++      n += 1u;
++      out << frame << "." << n << " ";
++
++      if (e.text.empty())
++        out << e.kind << " x" << e.draws << " prims=" << e.prims << " " << FormatKey(e.key) << "\n";
++      else if (e.kind == "Clear")
++        out << e.text << " " << FormatKey(e.key) << "\n";
++      else
++        out << e.text << "\n";
++    }
++
++    out << "\n## Pixel shader constants c0-c15 at the first draw of each named pixel shader\n";
++
++    for (const auto& c : m_psConstants)
++      out << ShaderName(c.first) << " " << c.second << "\n";
++
++    out << "\n## Shaders created so far without a name in the table\n";
++
++    for (uint32_t i = 0; i < m_shaders.size(); i++) {
++      if (m_shaders[i].name.empty()) {
++        unknown += 1u;
++        out << (m_shaders[i].pixel ? "ps " : "vs ") << m_shaders[i].sha1 << "\n";
++      }
++    }
++
++    out << "# " << m_shaders.size() << " shaders created, " << unknown << " without a name\n";
++    Logger::info(str::format("D3D9 frame census: wrote ", path, " (", draws, " draws, ", segments, " segments)"));
++  }
++
++}
+diff --git a/src/d3d9/d3d9_frame_census.h b/src/d3d9/d3d9_frame_census.h
+new file mode 100644
+index 0000000..9d498d1
+--- /dev/null
++++ b/src/d3d9/d3d9_frame_census.h
+@@ -0,0 +1,122 @@
++#pragma once
++
++#include <cstdint>
++#include <string>
++#include <unordered_map>
++#include <vector>
++
++#include "d3d9_include.h"
++#include "d3d9_state.h"
++
++namespace dxvk {
++
++  class D3D9CommonTexture;
++  class D3D9Surface;
++  struct D3D9Options;
++
++  /**
++   * \brief Divinity II Reborn frame census
++   *
++   * Diagnostic only, never changes what is rendered. When armed by the
++   * hotkey (or at a given frame number) it records every draw, clear and
++   * StretchRect of the next frames: bound render targets and depth-stencil,
++   * vertex/pixel shader (named through a table of bytecode SHA-1 ->
++   * effect / technique / pass, generated by tools/re/fx_effects.py) and the
++   * render-target textures that are sampled. Consecutive draws with the same
++   * state are merged into one line. The result is written next to the exe.
++   */
++  class D3D9FrameCensus {
++
++  public:
++
++    D3D9FrameCensus(const D3D9Options& Options);
++
++    /**
++     * \brief Registers a created shader
++     * \returns Census id to store in the shader object (never 0)
++     */
++    uint32_t NameShader(const void* pBytecode, size_t Length, bool Pixel);
++
++    bool IsCapturing() const {
++      return m_capturing;
++    }
++
++    void OnDraw(Direct3DState9& State, const char* pKind, uint32_t PrimitiveCount);
++
++    void OnClear(Direct3DState9& State, DWORD Flags, D3DCOLOR Color, float Z, DWORD RectCount);
++
++    void OnStretchRect(D3D9Surface* pSrc, D3D9Surface* pDst, D3DTEXTUREFILTERTYPE Filter);
++
++    void OnPresent();
++
++  private:
++
++    struct ShaderInfo {
++      std::string sha1;
++      std::string name;
++      bool        pixel;
++    };
++
++    struct ResourceInfo {
++      std::string desc;
++      uint32_t    writes = 0u;
++      uint32_t    reads  = 0u;
++    };
++
++    struct DrawKey {
++      uint32_t rt[caps::MaxSimultaneousRenderTargets] = { };
++      uint32_t ds = 0u;
++      uint32_t vs = 0u;
++      uint32_t ps = 0u;
++      std::vector<std::pair<uint32_t, uint32_t>> sampled;   // sampler -> resource id (RT/DS textures only)
++      uint32_t otherTextures = 0u;
++
++      bool operator == (const DrawKey& other) const;
++    };
++
++    struct Event {
++      DrawKey     key;
++      std::string kind;
++      std::string text;
++      uint32_t    frame = 0u;
++      uint32_t    draws = 0u;
++      uint64_t    prims = 0u;
++    };
++
++    std::unordered_map<std::string, std::string> m_table;
++    std::unordered_map<std::string, uint32_t>    m_shaderIds;
++    std::vector<ShaderInfo>                      m_shaders;
++
++    std::unordered_map<const void*, uint32_t>    m_resourceIds;
++    std::vector<ResourceInfo>                    m_resources;
++
++    std::vector<Event> m_events;
++
++    std::unordered_map<uint32_t, std::string>    m_psConstants;
++
++    std::string m_dir;
++    int32_t     m_key;
++    uint32_t    m_framesToCapture;
++    uint32_t    m_autoFrame;
++    uint32_t    m_presentCount  = 0u;
++    uint32_t    m_framesLeft    = 0u;
++    uint32_t    m_captureFrame  = 0u;
++    uint32_t    m_firstFrame    = 0u;
++    bool        m_keyDown       = false;
++    bool        m_capturing     = false;
++
++    void LoadTable(const std::string& path);
++
++    DrawKey MakeKey(Direct3DState9& State);
++
++    uint32_t ResourceId(D3D9CommonTexture* pTexture, D3D9Surface* pSurface);
++
++    std::string ShaderName(uint32_t Id) const;
++
++    std::string FormatKey(const DrawKey& Key) const;
++
++    void Write();
++
++  };
++
++}
+diff --git a/src/d3d9/d3d9_options.cpp b/src/d3d9/d3d9_options.cpp
+index a446d58..a336faa 100644
+--- a/src/d3d9/d3d9_options.cpp
++++ b/src/d3d9/d3d9_options.cpp
+@@ -77,6 +77,15 @@ namespace dxvk {
+     this->stagingMemoryPerSubmission    = config.getOption<int32_t>     ("d3d9.stagingMemoryPerSubmission",    0);
+     this->parallelManagedUploadThreads  = config.getOption<int32_t>     ("d3d9.parallelManagedUploadThreads",  0);
+     this->deferUnmappableRelease        = config.getOption<bool>        ("d3d9.deferUnmappableRelease",        false);
++    this->frameCensus                   = config.getOption<bool>        ("d3d9.frameCensus",                   false);
++    this->frameCensusKey                = config.getOption<int32_t>     ("d3d9.frameCensusKey",                0x79);
++    this->frameCensusFrames             = config.getOption<int32_t>     ("d3d9.frameCensusFrames",             1);
++    this->frameCensusAtFrame            = config.getOption<int32_t>     ("d3d9.frameCensusAtFrame",            0);
++    this->frameCensusShaderNames        = config.getOption<std::string> ("d3d9.frameCensusShaderNames",        "");
++
++    // String options parse an unset value as empty, so the default is applied here
++    if (this->frameCensusShaderNames.empty())
++      this->frameCensusShaderNames = "Div2Reborn_shaders.txt";
+     this->deviceLossOnFocusLoss         = config.getOption<bool>        ("d3d9.deviceLossOnFocusLoss",         false);
+     this->samplerLodBias                = config.getOption<float>       ("d3d9.samplerLodBias",                0.0f);
+     this->clampNegativeLodBias          = config.getOption<bool>        ("d3d9.clampNegativeLodBias",          false);
+diff --git a/src/d3d9/d3d9_options.h b/src/d3d9/d3d9_options.h
+index a40d2e9..763d962 100644
+--- a/src/d3d9/d3d9_options.h
++++ b/src/d3d9/d3d9_options.h
+@@ -177,6 +177,22 @@ namespace dxvk {
+     /// on a background thread instead of the application thread.
+     bool deferUnmappableRelease;
+ 
++    /// Divinity II Reborn frame census: record draws, render targets and named
++    /// shaders of a few frames on a hotkey. Diagnostic only, rendering unchanged.
++    bool frameCensus;
++
++    /// Virtual-key code that starts a census (0 = no hotkey)
++    int32_t frameCensusKey;
++
++    /// Number of consecutive frames to record (1-8)
++    int32_t frameCensusFrames;
++
++    /// Also start a census at this presented frame (0 = only by hotkey)
++    int32_t frameCensusAtFrame;
++
++    /// Shader name table (sha1 stage effect technique pass), relative to the exe
++    std::string frameCensusShaderNames;
++
+     /// Shader dump path
+     std::string shaderDumpPath;
+ 
+diff --git a/src/d3d9/d3d9_shader.h b/src/d3d9/d3d9_shader.h
+index 8428df1..489fc82 100644
+--- a/src/d3d9/d3d9_shader.h
++++ b/src/d3d9/d3d9_shader.h
+@@ -194,12 +194,21 @@ namespace dxvk {
+       return &m_shader;
+     }
+ 
++    uint32_t GetCensusId() const {
++      return m_censusId;
++    }
++
++    void SetCensusId(uint32_t Id) {
++      m_censusId = Id;
++    }
++
+   private:
+ 
+     D3D9CommonShader m_shader;
+ 
+     MemoryFileRegion m_bytecode;
+     uint32_t         m_bytecodeLength;
++    uint32_t         m_censusId = 0u;
+ 
+   };
+ 
+diff --git a/src/d3d9/d3d9_swapchain.cpp b/src/d3d9/d3d9_swapchain.cpp
+index d672f11..6480b16 100644
+--- a/src/d3d9/d3d9_swapchain.cpp
++++ b/src/d3d9/d3d9_swapchain.cpp
+@@ -125,6 +125,8 @@ namespace dxvk {
+     if (m_backBuffers.empty())
+       return D3D_OK;
+ 
++    m_parent->OnCensusPresent();
++
+     uint32_t presentInterval = m_presentParams.PresentationInterval;
+ 
+     // This is not true directly in d3d9 to to timing differences that don't matter for us.
+diff --git a/src/d3d9/meson.build b/src/d3d9/meson.build
+index eeecfb7..f388f0e 100644
+--- a/src/d3d9/meson.build
++++ b/src/d3d9/meson.build
+@@ -40,6 +40,7 @@ d3d9_src = [
+   'd3d9_util.cpp',
+   'd3d9_initializer.cpp',
+   'd3d9_parallel_copy.cpp',
++  'd3d9_frame_census.cpp',
+   'd3d9_fixed_function.cpp',
+   'd3d9_names.cpp',
+   'd3d9_swvp_emu.cpp',

@@ -1,18 +1,33 @@
-SHA-256 of DivinityIIReborn_v1.4.2.zip and the files in it
+SHA-256 of DivinityIIReborn_v1.5.zip and the files in it
 
-ecb554e652c6782e541acbb7c64b519a29fe62a99c090b2402b06b28d6f9ebb2  DivinityIIReborn_v1.4.2.zip
+c4bd05d749502c1c39fe0e8682f0aa0b39e198af9f13e4e1a670f5b87a7f3f86  DivinityIIReborn_v1.5.zip
 
-ff32f94f5484c7e2966eedce48705e9abc1eb732bff4a38510097fd3f71d7966  _Div2Reborn/Optional/SkillBalance/FOV_Patch_2.dv2  OPTIONAL skill-balance module (game data archive, changes gameplay; not installed by extracting)
-6243c6837a2ecd76d2cb24f909cbdea1479bbc8dcffb8e3451799356c949e966  _Div2Reborn/uninstall.cmd                          uninstaller (plain batch file, deletes only the mod's own files)
-b1571ee5cb33deb5336c9cf000e364f1853cf5848c1af26ce19a2e2588a5e9f2  bin/d3d9.dll                                       DXVK 3.1.1 + dxvk/patches (0001-0006), built with dxvk/build_dxvk.sh (MSYS2 MINGW32, GCC 16.2)
-ba056efd56312cc06b8f5cbc573ba2f8bb0bca4f792ffdbd3e66051ff707a34e  bin/dinput8.dll                                    Div2Fix 1.4.2, built from div2fix/ in this repository
-9e0900c5f4b12d3f97126716458767239cbc59074f15f2f420130aa438ca1731  bin/Div2Fix.ini                                    settings (text)
-ec01d6d55a5278c159b808274fd40cbe9a96505159105960e199a61dd801fb28  bin/Div2Fix_mindread.txt                           mind-read advisor table (text)
-ebe7cde8ca18be3398558cdcd661e43752026c38eda486a30118ed294ee9adbd  bin/dxvk.conf                                      DXVK settings (text)
+ff32f94f5484c7e2966eedce48705e9abc1eb732bff4a38510097fd3f71d7966  _Div2Reborn/Optional/SkillBalance/FOV_Patch_2.dv2                          OPTIONAL skill-balance module (game data archive, changes gameplay; not installed by extracting)
+e3b6f2521c7f28575cfea7f3b8bc84ff498e3179559c86bffb1784741ea8a2a4  _Div2Reborn/uninstall.cmd                                                  uninstaller (plain batch file, deletes only the mod's own files)
+ef8089d0a2d18c348e557d5557373abf3984db0e305bcc2e3eed308b7a4d0557  bin/d3d9.dll                                                               DXVK 3.1.1 + dxvk/patches (0001-0006, 0009-0015), built with dxvk/build_dxvk.sh (MSYS2 MINGW32, GCC 16.2)
+de8a51ca7d3e4f3d8e16fcd13e0815ff80fe6696b4502ae17e4a6cb41d0f2868  bin/dinput8.dll                                                            Div2Fix 1.5, built from div2fix/ in this repository
+345f6abf216e7795d8bb4d1c5b42c0b20dbdde87f790665fbb967940c1d29166  bin/Div2Fix.ini                                                            settings (text)
+ec01d6d55a5278c159b808274fd40cbe9a96505159105960e199a61dd801fb28  bin/Div2Fix_mindread.txt                                                   mind-read advisor table (text)
+c70455cb5cf9bf144fc0c8e9475071c47814a8c12e58857b4c7dd9bcfa9df465  bin/dxvk.conf                                                              DXVK settings (text)
+1e7e90055d08d596b33d83c55958e3074ef50f4e071f941a3dfcfa59a1bcd04d  bin/Div2Reborn_override/far/d50c5e8e8201ae4165e7edeca1b991f8cf1c16bf.dxso  lighting shaders, built from shaders/far by tools/shaders/build_overrides.py
+a6705812f2bfe4e5ec24139922bccc1b5bb29e6626aa267e8239de7f3565c1af  bin/Div2Reborn_override/far/e6bef6f7376173eb73df5390447a1067939c5e8a.dxso  lighting shaders, built from shaders/far by tools/shaders/build_overrides.py
+3b6c18f1d963e03745b6f4cbddace35d2eb33c0fdb125b852ec3c493cd4ddd15  bin/Div2Reborn_post/AreaTex.bin                                            SMAA/TAA passes, built from shaders/ by tools/shaders/build_post.py
+8488e2e35e9dd4f1eef642057366f247fa2c9d3eefae84cdd76810d94a5e5a3a  bin/Div2Reborn_post/SearchTex.bin                                          SMAA/TAA passes, built from shaders/ by tools/shaders/build_post.py
+f3fa807234d7053cf7f4997be4860e800d13c9974853c00b6a4ffa9eb9f9f586  bin/Div2Reborn_post/smaa_blend.ps.dxso                                     SMAA/TAA passes, built from shaders/ by tools/shaders/build_post.py
+193a9e94f450cdc9ed1944facb897568892a38f53a0b9a409de4f1f3f9f0b1dd  bin/Div2Reborn_post/smaa_blend.vs.dxso                                     SMAA/TAA passes, built from shaders/ by tools/shaders/build_post.py
+96b6e720cf0420be38718bc577b9923b764b49471e6744a35858df7af77eb71b  bin/Div2Reborn_post/smaa_edge.ps.dxso                                      SMAA/TAA passes, built from shaders/ by tools/shaders/build_post.py
+c445039645a43bb86ff0b179b09a425d5305e01005bb9a4e299a473ad3284c25  bin/Div2Reborn_post/smaa_edge.vs.dxso                                      SMAA/TAA passes, built from shaders/ by tools/shaders/build_post.py
+27d0a46b94ba75d5054801719c05537254ab35ec3c06727d096ecb9b58a8571b  bin/Div2Reborn_post/smaa_edge_geo.ps.dxso                                  SMAA/TAA passes, built from shaders/ by tools/shaders/build_post.py
+461f293edd12ed73cc42c04272fcd10ebc978ecefb85ec40aafa2bf8db0edce7  bin/Div2Reborn_post/smaa_weight.ps.dxso                                    SMAA/TAA passes, built from shaders/ by tools/shaders/build_post.py
+068b061b604bebde2d52413def0b51cae9bac6af6d527f7a328a802b2c1830bd  bin/Div2Reborn_post/smaa_weight.vs.dxso                                    SMAA/TAA passes, built from shaders/ by tools/shaders/build_post.py
+ec420d51736007ee6834d1c6ecb7be51db9ac503ae48d620bbff7136abf98fc8  bin/Div2Reborn_post/taa.ps.dxso                                            SMAA/TAA passes, built from shaders/ by tools/shaders/build_post.py
+23f0b00cf63a1083d0214459dac6e509a7d6e476be8dfc2f1a11221fba53034b  bin/Div2Reborn_post/taa.vs.dxso                                            SMAA/TAA passes, built from shaders/ by tools/shaders/build_post.py
+e6fe96fbaee6bfa731f5c50c2b7962d089f9d7aabdcb4a0d644806b50f16ae93  Data/Win32/Packed/Reborn/Reborn_FX.dv2                                     effects pack (game data archive, upscaled effect textures)
 
-All files with hashes: see the release notes / DivinityIIReborn_v1.4.2_SHA256.txt.
+All files with hashes: see the release notes / DivinityIIReborn_v1.5_SHA256.txt.
 
 Reproducing dinput8.dll: building div2fix/ with LLVM (build.sh or build.cmd) gives a file that is
 byte-identical to the released one except the 4-byte PE TimeDateStamp at file offset 0x80 (same LLVM version).
+*.dxso and the SMAA lookup textures: tools/shaders/ rebuilds them byte for byte (with the system d3dcompiler_47).
 d3d9.dll: a GCC/MinGW build is not bit-reproducible across toolchains; compare behaviour, or use the official
 DXVK 3.1.1 x32/d3d9.dll instead (see README).

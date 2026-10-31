@@ -19,6 +19,9 @@ void gfx_init(Module m);
 void parcopy_init(Module m);
 void crashguard_init(Module m);
 void crashguard_exit(void);
+/* address space of the process in MB (diag.c): used, free, largest free block, private bytes */
+typedef struct { DWORD usedMB, freeMB, largestMB, privMB; } AddrSpace;
+void addr_space(AddrSpace* a);
 int parcopy_pool(int threads);
 void parcopy_run(void* dst, const void* src, DWORD n, int workers);
 int __cdecl parcopy_memcpy_s(void* dst, SIZE_T dstSize, const void* src, SIZE_T count);
@@ -27,6 +30,7 @@ void mindread_init(Module m);
 void camera_init(Module m);
 void icons_init(Module m);
 void intro_init(Module m);
+void overlay_init(Module m);
 int version_check(Module m);
 void shadow_on_device(void* dev);
 int shadow_wanted(void);

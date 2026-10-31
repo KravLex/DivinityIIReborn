@@ -15,6 +15,8 @@
  *    first return addresses of an access violation / illegal instruction / stack overflow / divide by zero to
  *    Div2Fix.log, at most 16 entries. First-chance only (the game may handle some itself) - it never changes how an
  *    exception is handled.
+ *    Each entry also gets the address space (used / free / largest free block / private MB); a stack overflow also
+ *    gets a scan of the whole stack (return addresses per module, the outermost calls in the game).
  */
 #include "common.h"
 
@@ -75,6 +77,71 @@ static void mod_name(DWORD a, char* out, DWORD* off)
     int i = 0; for (; path[b + i] && i < 39; i++) out[i] = path[b + i]; out[i] = 0;
     *off = a - (DWORD)mi.AllocationBase;
 }
+/* v looks like a return address: the bytes before it are a call (E8 rel32, FF 15 [abs], FF D0+r, FF 50+r disp8) */
+static int is_return(DWORD v)
+{
+    if (v < 0x10000 || !readable((void*)(v - 6), 6)) return 0;
+    const BYTE* q = (const BYTE*)v;
+    return q[-5] == 0xE8 || (q[-6] == 0xFF && q[-5] == 0x15) || (q[-2] == 0xFF && (q[-1] & 0xF8) == 0xD0) || (q[-3] == 0xFF && (q[-2] & 0xF8) == 0x50);
+}
+
+/* Stack overflow: the 6 return addresses at the top only show where the stack ran out, not what filled it. Scan
+   the whole stack (ESP up to the TEB's StackBase, fs:[4]) for return addresses: how many per module, and the
+   outermost ones in the game (the call path that started the deep part). Static buffers: little stack is left. */
+typedef struct { DWORD base, n; } ModCount;
+static ModCount g_mods[12], g_hot[64];        /* g_hot: game return addresses and how often they occur (the loop) */
+static DWORD g_outer[10], g_inner[24];
+static char g_sline[1000];
+static void stack_report(DWORD esp)
+{
+    DWORD top; __asm__ volatile("movl %%fs:4, %0" : "=r"(top));
+    if (top <= esp || top - esp > 0x4000000) return;
+    BYTE* exe = main_module().base;
+    int nm = 0, no = 0, nh = 0; DWORD total = 0, pageOk = 0;
+    for (DWORD a = esp & ~3u; a < top; a += 4) {
+        if ((a & 0xFFF) == 0 || a == (esp & ~3u)) pageOk = readable((void*)a, 4);
+        if (!pageOk) continue;
+        DWORD v = *(const DWORD*)a;
+        if (!is_return(v)) continue;
+        MEMORY_BASIC_INFORMATION mi;
+        if (!VirtualQuery((void*)v, &mi, sizeof mi) || mi.Type != MEM_IMAGE) continue;
+        DWORD b = (DWORD)mi.AllocationBase; int k = 0;
+        while (k < nm && g_mods[k].base != b) k++;
+        if (k == nm && nm < 12) { g_mods[nm].base = b; g_mods[nm].n = 0; nm++; }
+        if (k < nm) g_mods[k].n++;
+        total++;
+        if ((BYTE*)b == exe) {
+            if (no < 24) g_inner[no] = v;
+            g_outer[no % 10] = v; no++;                                 /* ring: keeps the 10 closest to the base */
+            int h = 0; while (h < nh && g_hot[h].base != v) h++;
+            if (h == nh && nh < 64) { g_hot[nh].base = v; g_hot[nh].n = 0; nh++; }
+            if (h < nh) g_hot[h].n++;
+        }
+    }
+    int n = wsprintfA(g_sline, "  stack: %u KB used, %u return addresses:", (top - esp) >> 10, total);
+    for (int k = 0; k < nm && n < 800; k++) {
+        char mm[40]; DWORD o; mod_name(g_mods[k].base, mm, &o);
+        n += wsprintfA(g_sline + n, " %s %u", mm[0] ? mm : "?", g_mods[k].n);
+    }
+    logf("%s", g_sline);
+    n = wsprintfA(g_sline, "  outermost game calls (innermost first):");
+    for (int i = no > 10 ? no - 10 : 0; i < no && n < 900; i++)
+        n += wsprintfA(g_sline + n, " %08X", g_outer[i % 10] - (DWORD)exe + 0x400000);
+    logf("%s", g_sline);
+    n = wsprintfA(g_sline, "  innermost game calls:");
+    for (int i = 0; i < no && i < 24; i++) n += wsprintfA(g_sline + n, " %08X", g_inner[i] - (DWORD)exe + 0x400000);
+    logf("%s", g_sline);
+    n = wsprintfA(g_sline, "  most frequent game return addresses (address x count):");
+    for (int k = 0; k < 10; k++) {                                       /* selection of the 10 biggest counts */
+        int best = -1;
+        for (int h = 0; h < nh; h++) if (g_hot[h].n && (best < 0 || g_hot[h].n > g_hot[best].n)) best = h;
+        if (best < 0) break;
+        n += wsprintfA(g_sline + n, " %08X x%u", g_hot[best].base - (DWORD)exe + 0x400000, g_hot[best].n);
+        g_hot[best].n = 0;
+    }
+    logf("%s", g_sline);
+}
+
 static long WINAPI veh(ExPointers* ep)
 {
     DWORD code = ep->rec->code;
@@ -89,14 +156,16 @@ static long WINAPI veh(ExPointers* ep)
     int found = 0;
     for (int i = 0; i < 256 && found < 6 && readable(sp + i, 4); i++) {
         DWORD v = sp[i]; char mm[40]; DWORD o;
-        if (v < 0x10000 || !readable((void*)(v - 6), 6)) continue;
-        const BYTE* q = (const BYTE*)v;
-        if (q[-5] != 0xE8 && !(q[-6] == 0xFF && q[-5] == 0x15) && !(q[-2] == 0xFF && (q[-1] & 0xF8) == 0xD0) && !(q[-3] == 0xFF && (q[-2] & 0xF8) == 0x50)) continue;
+        if (!is_return(v)) continue;
         mod_name(v, mm, &o); if (!mm[0]) continue;
         n += wsprintfA(line + n, " <- %s+%08X", mm, o); found++;
         if (n > 420) break;
     }
+    n += wsprintfA(line + n, " (thread %u)", GetCurrentThreadId());
     logf("%s", line);
+    AddrSpace as; addr_space(&as);
+    logf("  memory: %u MB used, %u MB free (largest block %u MB), %u MB private", as.usedMB, as.freeMB, as.largestMB, as.privMB);
+    if (code == 0xC00000FD) stack_report((DWORD)sp);
     return 0;
 }
 

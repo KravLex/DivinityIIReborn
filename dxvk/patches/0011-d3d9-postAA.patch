@@ -1,0 +1,902 @@
+diff --git a/src/d3d9/d3d9_device.cpp b/src/d3d9/d3d9_device.cpp
+index d447b6c..af33ff7 100644
+--- a/src/d3d9/d3d9_device.cpp
++++ b/src/d3d9/d3d9_device.cpp
+@@ -81,6 +81,9 @@ namespace dxvk {
+     if (!m_d3d9Options.shaderOverridePath.empty())
+       m_shaderOverride = std::make_unique<D3D9ShaderOverride>(m_d3d9Options);
+ 
++    if (m_d3d9Options.postAA)
++      m_postAA = std::make_unique<D3D9PostAA>(this, m_d3d9Options);
++
+     if (m_dxvkDevice->debugFlags().test(DxvkDebugFlag::Markers))
+       m_annotation = new D3D9UserDefinedAnnotation(this);
+ 
+@@ -170,12 +173,18 @@ namespace dxvk {
+   D3D9DeviceEx::~D3D9DeviceEx() {
+     // Avoids hanging when in this state, see comment
+     // in DxvkDevice::~DxvkDevice.
+-    if (this_thread::isInModuleDetachment())
++    if (this_thread::isInModuleDetachment()) {
++      // Divinity II Reborn post AA: its resources must not be released this late either
++      m_postAA.release();
+       return;
++    }
+ 
+     ExecuteFlush(true);
+     SynchronizeCsThread(DxvkCsThread::SynchronizeAll);
+ 
++    // Divinity II Reborn post AA: release its private resources while the device is complete
++    m_postAA = nullptr;
++
+     if (m_annotation)
+       delete m_annotation;
+ 
+@@ -461,6 +470,10 @@ namespace dxvk {
+   HRESULT STDMETHODCALLTYPE D3D9DeviceEx::Reset(D3DPRESENT_PARAMETERS* pPresentationParameters) {
+     D3D9DeviceLock lock = LockDevice();
+ 
++    // Divinity II Reborn post AA: its default-pool render targets would make the reset fail
++    if (unlikely(m_postAA != nullptr))
++      m_postAA->ReleaseResources();
++
+     Logger::info("Device reset");
+     m_deviceLostState = D3D9DeviceLostState::Ok;
+ 
+@@ -1240,6 +1253,8 @@ namespace dxvk {
+     if (unlikely(src == dst))
+       return D3DERR_INVALIDCALL;
+ 
++    RunPendingPostAA();
++
+     if (unlikely(m_census != nullptr && m_census->IsCapturing()))
+       m_census->OnStretchRect(src, dst, Filter);
+ 
+@@ -1920,6 +1935,8 @@ namespace dxvk {
+ 
+     D3D9DeviceLock lock = LockDevice();
+ 
++    RunPendingPostAA();
++
+     if (unlikely(m_census != nullptr && m_census->IsCapturing()))
+       m_census->OnClear(m_state, Flags, Color, Z, Count);
+ 
+@@ -3052,9 +3069,13 @@ namespace dxvk {
+     if (unlikely(!PrimitiveCount))
+       return D3D_OK;
+ 
++    RunPendingPostAA();
++
+     if (unlikely(m_census != nullptr && m_census->IsCapturing()))
+       m_census->OnDraw(m_state, "DP", PrimitiveCount);
+ 
++    ArmPostAA();
++
+     bool dynamicSysmemVBOs = false;
+ 
+     uint32_t firstIndex     = 0;
+@@ -3107,9 +3128,13 @@ namespace dxvk {
+     if (unlikely(!PrimitiveCount || !NumVertices))
+       return D3D_OK;
+ 
++    RunPendingPostAA();
++
+     if (unlikely(m_census != nullptr && m_census->IsCapturing()))
+       m_census->OnDraw(m_state, "DIP", PrimitiveCount);
+ 
++    ArmPostAA();
++
+     bool dynamicSysmemVBOs = false;
+     bool dynamicSysmemIBO = false;
+ 
+@@ -3174,9 +3199,13 @@ namespace dxvk {
+     if (unlikely(!PrimitiveCount))
+       return D3D_OK;
+ 
++    RunPendingPostAA();
++
+     if (unlikely(m_census != nullptr && m_census->IsCapturing()))
+       m_census->OnDraw(m_state, "DPUP", PrimitiveCount);
+ 
++    ArmPostAA();
++
+     PrepareDraw(PrimitiveType, false, false);
+ 
+     uint32_t vertexCount = GetVertexCount(PrimitiveType, PrimitiveCount);
+@@ -3231,9 +3260,13 @@ namespace dxvk {
+     if (unlikely(!PrimitiveCount || !NumVertices))
+       return D3D_OK;
+ 
++    RunPendingPostAA();
++
+     if (unlikely(m_census != nullptr && m_census->IsCapturing()))
+       m_census->OnDraw(m_state, "DIPUP", PrimitiveCount);
+ 
++    ArmPostAA();
++
+     PrepareDraw(PrimitiveType, false, false);
+ 
+     uint32_t vertexCount = GetVertexCount(PrimitiveType, PrimitiveCount);
+@@ -3968,6 +4001,12 @@ namespace dxvk {
+     if (unlikely(m_census != nullptr))
+       shader->SetCensusId(m_census->NameShader(pFunction, bytecodeLength, true));
+ 
++    // Divinity II Reborn post AA runs after draws with this shader (by its original bytecode)
++    if (unlikely(m_postAA != nullptr)) {
++      shader->SetPostTrigger(m_postAA->IsTrigger(pFunction, bytecodeLength));
++      shader->SetPostGBufferReader(m_postAA->IsGBufferReader(pFunction, bytecodeLength));
++    }
++
+     *ppShader = ref(shader);
+ 
+     return D3D_OK;
+@@ -4555,6 +4594,9 @@ namespace dxvk {
+           D3DDISPLAYMODEEX*      pFullscreenDisplayMode) {
+     D3D9DeviceLock lock = LockDevice();
+ 
++    if (unlikely(m_postAA != nullptr))
++      m_postAA->ReleaseResources();
++
+     HRESULT hr;
+     if (likely(m_deviceType != D3DDEVTYPE_NULLREF)) {
+       hr = m_parent->ValidatePresentationParametersEx(pPresentationParameters, pFullscreenDisplayMode);
+diff --git a/src/d3d9/d3d9_device.h b/src/d3d9/d3d9_device.h
+index 4578cf5..f19fdb5 100644
+--- a/src/d3d9/d3d9_device.h
++++ b/src/d3d9/d3d9_device.h
+@@ -23,6 +23,7 @@
+ #include "d3d9_on_12.h"
+ #include "d3d9_frame_census.h"
+ #include "d3d9_shader_override.h"
++#include "d3d9_post_aa.h"
+ 
+ #include <cstdint>
+ #include <memory>
+@@ -1488,10 +1489,37 @@ namespace dxvk {
+      * Has to be externally synchronized.
+      */
+     void OnCensusPresent() {
++      RunPendingPostAA();
++
+       if (unlikely(m_census != nullptr))
+         m_census->OnPresent();
+     }
+ 
++    /**
++     * rief Runs Divinity II Reborn post AA if a tonemap draw armed it
++     *
++     * Called before the next draw, clear, copy or present.
++     * Has to be externally synchronized.
++     */
++    void RunPendingPostAA() {
++      if (unlikely(m_postAA != nullptr && m_postAA->IsPending()))
++        m_postAA->Run();
++    }
++
++    /**
++     * rief Arms Divinity II Reborn post AA when the current pixel shader is the trigger
++     */
++    void ArmPostAA() {
++      if (likely(m_postAA == nullptr || m_state.pixelShader == nullptr))
++        return;
++
++      if (m_state.pixelShader->IsPostGBufferReader())
++        m_postAA->NoteGBuffer(m_state.textures[0]);
++
++      if (m_state.pixelShader->IsPostTrigger())
++        m_postAA->Arm(m_state.renderTargets[0].ptr());
++    }
++
+     /**
+      * @brief Reset the most recently swapchain back to the implicit one
+      * Has to be externally synchronized.
+@@ -1653,6 +1681,7 @@ namespace dxvk {
+ 
+     std::unique_ptr<D3D9FrameCensus> m_census;
+     std::unique_ptr<D3D9ShaderOverride> m_shaderOverride;
++    std::unique_ptr<D3D9PostAA>      m_postAA;
+ 
+     VkImageLayout                   m_hazardLayout = VK_IMAGE_LAYOUT_GENERAL;
+ 
+diff --git a/src/d3d9/d3d9_options.cpp b/src/d3d9/d3d9_options.cpp
+index d88ed60..4a8bca0 100644
+--- a/src/d3d9/d3d9_options.cpp
++++ b/src/d3d9/d3d9_options.cpp
+@@ -88,6 +88,24 @@ namespace dxvk {
+       this->frameCensusShaderNames = "Div2Reborn_shaders.txt";
+ 
+     this->shaderOverridePath            = config.getOption<std::string> ("d3d9.shaderOverridePath",            "");
++    this->postAA                        = config.getOption<bool>        ("d3d9.postAA",                        false);
++    this->postAATrigger                 = config.getOption<std::string> ("d3d9.postAATrigger",                 "");
++    this->postAAPath                    = config.getOption<std::string> ("d3d9.postAAPath",                    "");
++    this->postAAKey                     = config.getOption<int32_t>     ("d3d9.postAAKey",                     0x2D);   // Insert
++    this->postAAGBufferShaders          = config.getOption<std::string> ("d3d9.postAAGBufferShaders",          "");
++
++    if (this->postAAGBufferShaders.empty()) {
++      // div2_PreLightPass Sun_..._VSM_Char, Sun_..._VSM_Char_Terrain, Hemisphere_Packed_ViewSpace
++      this->postAAGBufferShaders = "e6bef6f7376173eb73df5390447a1067939c5e8a,"
++                                   "d50c5e8e8201ae4165e7edeca1b991f8cf1c16bf,"
++                                   "6119555ad010ccf40568e7dfdeaf0405dc7ea8ff";
++    }
++
++    if (this->postAATrigger.empty())
++      this->postAATrigger = "93c1d04241ad56a274a25b9eba1892bb1a1755ab";   // HDRScene.fx / HDRScene_FinalScenePass
++
++    if (this->postAAPath.empty())
++      this->postAAPath = "Div2Reborn_post";
+     this->deviceLossOnFocusLoss         = config.getOption<bool>        ("d3d9.deviceLossOnFocusLoss",         false);
+     this->samplerLodBias                = config.getOption<float>       ("d3d9.samplerLodBias",                0.0f);
+     this->clampNegativeLodBias          = config.getOption<bool>        ("d3d9.clampNegativeLodBias",          false);
+diff --git a/src/d3d9/d3d9_options.h b/src/d3d9/d3d9_options.h
+index 5e40473..afb3ca6 100644
+--- a/src/d3d9/d3d9_options.h
++++ b/src/d3d9/d3d9_options.h
+@@ -197,6 +197,22 @@ namespace dxvk {
+     /// <sha1 of original bytecode>.dxso replacements. Empty = off.
+     std::string shaderOverridePath;
+ 
++    /// Divinity II Reborn post anti-aliasing: SMAA on the render target of the pixel shader
++    /// d3d9.postAATrigger (SHA-1 of its original bytecode, default: the engine's tonemap pass),
++    /// before anything else is drawn, i.e. before the interface. Shaders and lookup textures
++    /// from d3d9.postAAPath (relative to the exe).
++    bool postAA;
++    std::string postAATrigger;
++    std::string postAAPath;
++
++    /// Virtual-key code that cycles post AA: SMAA, off, show edges, show weights (0 = no key)
++    int32_t postAAKey;
++
++    /// Pixel shaders (SHA-1 of the original bytecode, comma separated) that read the engine's
++    /// packed depth + normal buffer at sampler 0 (light pre-pass); their texture is used for
++    /// geometry-aware SMAA edges. Empty = the light pre-pass shaders of Divinity II.
++    std::string postAAGBufferShaders;
++
+     /// Shader dump path
+     std::string shaderDumpPath;
+ 
+diff --git a/src/d3d9/d3d9_post_aa.cpp b/src/d3d9/d3d9_post_aa.cpp
+new file mode 100644
+index 0000000..a353d9b
+--- /dev/null
++++ b/src/d3d9/d3d9_post_aa.cpp
+@@ -0,0 +1,442 @@
++#include "d3d9_post_aa.h"
++
++#include "d3d9_device.h"
++#include "d3d9_options.h"
++#include "d3d9_shader.h"
++#include "d3d9_surface.h"
++#include "d3d9_texture.h"
++
++#include "../util/log/log.h"
++#include "../util/sha1/sha1_util.h"
++#include "../util/util_env.h"
++#include "../util/util_string.h"
++
++#include <cstring>
++#include <fstream>
++#include <iterator>
++
++namespace dxvk {
++
++  static const char* const PassNames[3] = { "smaa_edge", "smaa_weight", "smaa_blend" };
++
++  D3D9PostAA::D3D9PostAA(D3D9DeviceEx* pDevice, const D3D9Options& Options)
++  : m_device(pDevice), m_trigger(Options.postAATrigger), m_key(Options.postAAKey) {
++    for (size_t start = 0; start < Options.postAAGBufferShaders.size(); ) {
++      size_t end = Options.postAAGBufferShaders.find(',', start);
++      if (end == std::string::npos)
++        end = Options.postAAGBufferShaders.size();
++      std::string hash = Options.postAAGBufferShaders.substr(start, end - start);
++      size_t first = hash.find_first_not_of(" \t"), last = hash.find_last_not_of(" \t");
++      if (first != std::string::npos)
++        m_gbufferShaders.push_back(hash.substr(first, last - first + 1));
++      start = end + 1;
++    }
++
++    std::string dir = Options.postAAPath;
++    bool absolute = dir.size() > 1 && (dir[1] == ':' || dir[0] == '\\' || dir[0] == '/');
++
++    if (!absolute) {
++      std::string exe = env::getExePath();
++      auto n = exe.find_last_of("\\/");
++      dir = (n != std::string::npos ? exe.substr(0, n + 1) : std::string()) + dir;
++    }
++
++    if (!dir.empty() && dir.back() != '\\' && dir.back() != '/')
++      dir += '\\';
++
++    m_dir = dir;
++    Logger::info(str::format("D3D9 post AA: SMAA after pixel shader ", m_trigger, ", files from ", m_dir,
++      m_key > 0 ? str::format(", key VK ", m_key, " cycles SMAA / off / edges / weights") : std::string()));
++  }
++
++
++  D3D9PostAA::~D3D9PostAA() {
++    if (m_target)
++      m_target->Release();
++
++    ReleaseTargets();
++  }
++
++
++  bool D3D9PostAA::IsTrigger(const void* pBytecode, size_t Length) const {
++    return Length && Sha1Hash::compute(pBytecode, Length).toString() == m_trigger;
++  }
++
++
++  bool D3D9PostAA::IsGBufferReader(const void* pBytecode, size_t Length) const {
++    if (!Length || m_gbufferShaders.empty())
++      return false;
++
++    std::string hash = Sha1Hash::compute(pBytecode, Length).toString();
++
++    for (const auto& h : m_gbufferShaders) {
++      if (h == hash)
++        return true;
++    }
++
++    return false;
++  }
++
++
++  void D3D9PostAA::NoteGBuffer(IDirect3DBaseTexture9* pTexture) {
++    if (m_running || pTexture == nullptr || pTexture->GetType() != D3DRTYPE_TEXTURE)
++      return;
++
++    m_gbuffer = static_cast<D3D9Texture2D*>(pTexture);
++    m_gbufferFresh = true;
++  }
++
++
++  void D3D9PostAA::Arm(D3D9Surface* pTarget) {
++    if (m_failed || m_running || pTarget == nullptr || pTarget == m_target)
++      return;
++
++    pTarget->AddRef();
++
++    if (m_target)
++      m_target->Release();
++
++    m_target = pTarget;
++  }
++
++
++  std::vector<char> D3D9PostAA::ReadFile(const std::string& Path) {
++    std::ifstream file(str::topath(Path.c_str()).c_str(), std::ios_base::binary);
++
++    if (!file)
++      return { };
++
++    return std::vector<char>((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
++  }
++
++
++  void D3D9PostAA::Disable(const std::string& Reason) {
++    m_failed = true;
++    Logger::err(str::format("D3D9 post AA: disabled, ", Reason));
++  }
++
++
++  bool D3D9PostAA::LoadShaders() {
++    for (uint32_t i = 0; i < 3; i++) {
++      if (m_vs[i] && m_ps[i])
++        continue;
++
++      std::vector<char> vs = ReadFile(m_dir + PassNames[i] + ".vs.dxso");
++      std::vector<char> ps = ReadFile(m_dir + PassNames[i] + ".ps.dxso");
++
++      if (vs.size() < 8 || ps.size() < 8) {
++        Disable(str::format("missing ", m_dir, PassNames[i], ".vs/.ps.dxso"));
++        return false;
++      }
++
++      std::vector<DWORD> vsCode((vs.size() + 3u) / 4u + 1u, 0u);
++      std::vector<DWORD> psCode((ps.size() + 3u) / 4u + 1u, 0u);
++      std::memcpy(vsCode.data(), vs.data(), vs.size());
++      std::memcpy(psCode.data(), ps.data(), ps.size());
++
++      IDirect3DVertexShader9* vsObject = nullptr;
++      IDirect3DPixelShader9*  psObject = nullptr;
++      m_device->CreateVertexShader(vsCode.data(), &vsObject);
++      m_device->CreatePixelShader(psCode.data(), &psObject);
++      m_vs[i] = Private<D3D9VertexShader>(vsObject);
++      m_ps[i] = Private<D3D9PixelShader>(psObject);
++
++      if (m_vs[i] == nullptr || m_ps[i] == nullptr) {
++        Disable(str::format("shader ", PassNames[i], " was rejected"));
++        return false;
++      }
++    }
++
++    if (m_psGeometry == nullptr) {
++      // optional: without it only luma edges are used
++      std::vector<char> ps = ReadFile(m_dir + "smaa_edge_geo.ps.dxso");
++
++      if (ps.size() >= 8) {
++        std::vector<DWORD> psCode((ps.size() + 3u) / 4u + 1u, 0u);
++        std::memcpy(psCode.data(), ps.data(), ps.size());
++        IDirect3DPixelShader9* psObject = nullptr;
++        m_device->CreatePixelShader(psCode.data(), &psObject);
++        m_psGeometry = Private<D3D9PixelShader>(psObject);
++      }
++    }
++
++    return LoadTexture("AreaTex.bin", 160u, 560u, m_area)
++        && LoadTexture("SearchTex.bin", 64u, 16u, m_search);
++  }
++
++
++  Com<D3D9Texture2D, false> D3D9PostAA::CreateTexture(UINT Width, UINT Height, DWORD Usage, D3DFORMAT Format, D3DPOOL Pool) {
++    IDirect3DTexture9* texture = nullptr;
++
++    if (FAILED(m_device->CreateTexture(Width, Height, 1, Usage, Format, Pool, &texture, nullptr)))
++      return nullptr;
++
++    return Private<D3D9Texture2D>(texture);
++  }
++
++
++  bool D3D9PostAA::LoadTexture(const char* pName, UINT Width, UINT Height, Com<D3D9Texture2D, false>& Texture) {
++    if (Texture != nullptr)
++      return true;
++
++    std::vector<char> data = ReadFile(m_dir + pName);
++
++    if (data.size() != size_t(Width) * Height * 4u) {
++      Disable(str::format(m_dir, pName, " missing or not ", Width, "x", Height, " A8R8G8B8"));
++      return false;
++    }
++
++    Texture = CreateTexture(Width, Height, 0, D3DFMT_A8R8G8B8, D3DPOOL_MANAGED);
++
++    if (Texture == nullptr) {
++      Disable(str::format("cannot create ", pName));
++      return false;
++    }
++
++    D3DLOCKED_RECT rect;
++
++    if (FAILED(Texture->LockRect(0, &rect, nullptr, 0))) {
++      Disable(str::format("cannot fill ", pName));
++      return false;
++    }
++
++    for (UINT y = 0; y < Height; y++)
++      std::memcpy(reinterpret_cast<char*>(rect.pBits) + y * rect.Pitch, data.data() + y * Width * 4u, Width * 4u);
++
++    Texture->UnlockRect(0);
++    return true;
++  }
++
++
++  bool D3D9PostAA::PrepareTargets(UINT Width, UINT Height, D3DFORMAT Format) {
++    if (m_color != nullptr && Width == m_width && Height == m_height && Format == m_format)
++      return true;
++
++    ReleaseTargets();
++
++    m_color   = CreateTexture(Width, Height, D3DUSAGE_RENDERTARGET, Format, D3DPOOL_DEFAULT);
++    m_edges   = CreateTexture(Width, Height, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT);
++    m_weights = CreateTexture(Width, Height, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT);
++
++    if (m_color == nullptr || m_edges == nullptr || m_weights == nullptr) {
++      ReleaseTargets();
++      Disable(str::format("cannot create ", Width, "x", Height, " render targets"));
++      return false;
++    }
++
++    m_width  = Width;
++    m_height = Height;
++    m_format = Format;
++    Logger::info(str::format("D3D9 post AA: render targets ", Width, "x", Height, " format ", uint32_t(Format)));
++    return true;
++  }
++
++
++  void D3D9PostAA::ReleaseTargets() {
++    m_color = nullptr;
++    m_edges = nullptr;
++    m_weights = nullptr;
++    m_width = m_height = 0u;
++    m_format = D3DFMT_UNKNOWN;
++  }
++
++
++  void D3D9PostAA::ReleaseResources() {
++    if (m_target) {
++      m_target->Release();
++      m_target = nullptr;
++    }
++
++    m_gbuffer = nullptr;
++    m_gbufferFresh = false;
++
++    ReleaseTargets();
++  }
++
++
++  void D3D9PostAA::PollKey() {
++    if (m_key <= 0)
++      return;
++
++    bool down = (GetAsyncKeyState(m_key) & 0x8000) != 0;
++
++    if (down && !m_keyDown) {
++      static const char* const names[ModeCount] = { "SMAA", "off", "show edges", "show blending weights" };
++      m_mode = (m_mode + 1u) % ModeCount;
++      Logger::info(str::format("D3D9 post AA: mode ", names[m_mode]));
++    }
++
++    m_keyDown = down;
++  }
++
++
++  void D3D9PostAA::Run() {
++    D3D9Surface* target = m_target;
++    m_target = nullptr;
++
++    if (m_failed || !target)
++      return;
++
++    PollKey();
++
++    if (m_mode == ModeOff) {
++      target->Release();
++      return;
++    }
++
++    m_running = true;
++
++    D3DSURFACE_DESC desc;
++    target->GetDesc(&desc);
++
++    if (!LoadShaders() || !PrepareTargets(desc.Width, desc.Height, desc.Format)) {
++      target->Release();
++      m_running = false;
++      return;
++    }
++
++    // Save everything the passes touch: a state block for the fixed and shader state,
++    // render targets and depth buffer separately (state blocks do not hold them)
++    IDirect3DStateBlock9* saved = nullptr;
++    IDirect3DSurface9* rts[4] = { };
++    IDirect3DSurface9* ds = nullptr;
++
++    m_device->CreateStateBlock(D3DSBT_ALL, &saved);
++
++    for (DWORD i = 0; i < 4; i++)
++      m_device->GetRenderTarget(i, &rts[i]);
++
++    m_device->GetDepthStencilSurface(&ds);
++
++    IDirect3DSurface9* colorSurface = nullptr;
++    IDirect3DSurface9* edgesSurface = nullptr;
++    IDirect3DSurface9* weightsSurface = nullptr;
++    m_color->GetSurfaceLevel(0, &colorSurface);
++    m_edges->GetSurfaceLevel(0, &edgesSurface);
++    m_weights->GetSurfaceLevel(0, &weightsSurface);
++
++    m_device->StretchRect(target, nullptr, colorSurface, nullptr, D3DTEXF_POINT);
++
++    for (DWORD i = 1; i < 4; i++)
++      m_device->SetRenderTarget(i, nullptr);
++
++    m_device->SetDepthStencilSurface(nullptr);
++
++    static const std::pair<D3DRENDERSTATETYPE, DWORD> states[] = {
++      { D3DRS_ZENABLE, FALSE },             { D3DRS_ZWRITEENABLE, FALSE },
++      { D3DRS_ALPHABLENDENABLE, FALSE },    { D3DRS_ALPHATESTENABLE, FALSE },
++      { D3DRS_STENCILENABLE, FALSE },       { D3DRS_CULLMODE, D3DCULL_NONE },
++      { D3DRS_COLORWRITEENABLE, 0xF },      { D3DRS_SCISSORTESTENABLE, FALSE },
++      { D3DRS_SRGBWRITEENABLE, FALSE },     { D3DRS_FOGENABLE, FALSE },
++      { D3DRS_CLIPPLANEENABLE, 0 },         { D3DRS_FILLMODE, D3DFILL_SOLID },
++      { D3DRS_SEPARATEALPHABLENDENABLE, FALSE },
++    };
++
++    for (const auto& s : states)
++      m_device->SetRenderState(s.first, s.second);
++
++    float metrics[4] = { 1.0f / float(desc.Width), 1.0f / float(desc.Height), float(desc.Width), float(desc.Height) };
++    m_device->SetVertexShaderConstantF(0, metrics, 1);
++    m_device->SetPixelShaderConstantF(0, metrics, 1);
++    m_device->SetFVF(D3DFVF_XYZ | D3DFVF_TEX1);
++
++    for (DWORD s = 0; s < 3; s++) {
++      m_device->SetSamplerState(s, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP);
++      m_device->SetSamplerState(s, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP);
++      m_device->SetSamplerState(s, D3DSAMP_MIPFILTER, D3DTEXF_NONE);
++      m_device->SetSamplerState(s, D3DSAMP_MAXMIPLEVEL, 0);
++      m_device->SetSamplerState(s, D3DSAMP_SRGBTEXTURE, FALSE);
++    }
++
++    struct Vertex { float x, y, z, u, v; };
++    static const Vertex quad[4] = {
++      { -1.0f,  1.0f, 0.5f, 0.0f, 0.0f }, { 1.0f,  1.0f, 0.5f, 1.0f, 0.0f },
++      { -1.0f, -1.0f, 0.5f, 0.0f, 1.0f }, { 1.0f, -1.0f, 0.5f, 1.0f, 1.0f },
++    };
++
++    auto filter = [this] (DWORD stage, D3DTEXTUREFILTERTYPE f) {
++      m_device->SetSamplerState(stage, D3DSAMP_MINFILTER, f);
++      m_device->SetSamplerState(stage, D3DSAMP_MAGFILTER, f);
++    };
++
++    auto pass = [&] (uint32_t i, IDirect3DSurface9* rt, bool clear, IDirect3DPixelShader9* ps) {
++      m_device->SetRenderTarget(0, rt);
++      if (clear)
++        m_device->Clear(0, nullptr, D3DCLEAR_TARGET, 0, 1.0f, 0);
++      m_device->SetVertexShader(m_vs[i].ptr());
++      m_device->SetPixelShader(ps ? ps : m_ps[i].ptr());
++      m_device->DrawPrimitiveUP(D3DPT_TRIANGLESTRIP, 2, quad, sizeof(Vertex));
++    };
++
++    // 1. edges of the scene: where the geometry has edges if this frame's depth + normal buffer
++    //    matches the target, otherwise (menus, other targets) luma edges
++    bool geometry = false;
++
++    if (m_gbufferFresh && m_gbuffer != nullptr && m_psGeometry != nullptr) {
++      D3DSURFACE_DESC gdesc;
++      geometry = SUCCEEDED(m_gbuffer->GetLevelDesc(0, &gdesc))
++              && gdesc.Width == desc.Width && gdesc.Height == desc.Height;
++
++      if (geometry && !m_geometryLogged) {
++        m_geometryLogged = true;
++        Logger::info(str::format("D3D9 post AA: geometry edges from the engine's depth + normal buffer (",
++          gdesc.Width, "x", gdesc.Height, " format ", uint32_t(gdesc.Format), ")"));
++      }
++    }
++
++    m_gbufferFresh = false;
++
++    m_device->SetTexture(0, m_color.ptr());
++    m_device->SetTexture(1, geometry ? m_gbuffer.ptr() : nullptr);
++    m_device->SetTexture(2, nullptr);
++    filter(0, D3DTEXF_LINEAR);
++    filter(1, D3DTEXF_POINT);
++    pass(0, edgesSurface, true, geometry ? m_psGeometry.ptr() : nullptr);
++
++    // 2. blending weights
++    m_device->SetTexture(0, m_edges.ptr());
++    m_device->SetTexture(1, m_area.ptr());
++    m_device->SetTexture(2, m_search.ptr());
++    filter(1, D3DTEXF_LINEAR);
++    filter(2, D3DTEXF_POINT);
++    pass(1, weightsSurface, true, nullptr);
++
++    // 3. neighbourhood blending into the engine's target (or, for diagnosis, the edges or weights themselves)
++    if (m_mode == ModeEdges) {
++      m_device->StretchRect(edgesSurface, nullptr, target, nullptr, D3DTEXF_POINT);
++    } else if (m_mode == ModeWeights) {
++      m_device->StretchRect(weightsSurface, nullptr, target, nullptr, D3DTEXF_POINT);
++    } else {
++      m_device->SetTexture(0, m_color.ptr());
++      m_device->SetTexture(1, m_weights.ptr());
++      m_device->SetTexture(2, nullptr);
++      pass(2, target, false, nullptr);
++    }
++
++    // Restore: render targets first (setting RT0 resets the viewport), then the state block
++    for (DWORD i = 0; i < 4; i++)
++      m_device->SetRenderTarget(i, rts[i]);
++
++    m_device->SetDepthStencilSurface(ds);
++
++    if (saved) {
++      saved->Apply();
++      saved->Release();
++    }
++
++    for (DWORD i = 0; i < 4; i++)
++      SafeRelease(rts[i]);
++
++    SafeRelease(ds);
++    SafeRelease(colorSurface);
++    SafeRelease(edgesSurface);
++    SafeRelease(weightsSurface);
++    target->Release();
++
++    if (!m_runs++)
++      Logger::info(str::format("D3D9 post AA: first SMAA pass done on a ", desc.Width, "x", desc.Height, " target"));
++
++    m_running = false;
++  }
++
++}
+diff --git a/src/d3d9/d3d9_post_aa.h b/src/d3d9/d3d9_post_aa.h
+new file mode 100644
+index 0000000..393c248
+--- /dev/null
++++ b/src/d3d9/d3d9_post_aa.h
+@@ -0,0 +1,144 @@
++#pragma once
++
++#include <cstdint>
++#include <string>
++#include <vector>
++
++#include "d3d9_include.h"
++
++#include "../util/com/com_pointer.h"
++
++namespace dxvk {
++
++  class D3D9DeviceEx;
++  class D3D9Surface;
++  class D3D9Texture2D;
++  class D3D9VertexShader;
++  class D3D9PixelShader;
++  struct D3D9Options;
++
++  /**
++   * \brief Divinity II Reborn post anti-aliasing (SMAA before the interface)
++   *
++   * The pixel shader whose original bytecode has the SHA-1 d3d9.postAATrigger (the engine's
++   * tonemap pass, HDRScene_FinalScenePass) is marked when it is created. When a draw with it is
++   * recorded, the pass is armed with that draw's render target; at the next draw, clear, copy or
++   * present (so after the tonemap and before the interface) SMAA runs on that target in three
++   * Direct3D 9 passes (edges, blending weights, neighbourhood blending) with shaders and lookup
++   * textures from d3d9.postAAPath (tools/shaders/build_post.py). The application's state is saved
++   * in a state block plus its render targets and depth buffer and restored afterwards.
++   */
++  class D3D9PostAA {
++
++  public:
++
++    D3D9PostAA(D3D9DeviceEx* pDevice, const D3D9Options& Options);
++
++    ~D3D9PostAA();
++
++    /**
++     * \brief Whether the original bytecode is the trigger shader
++     */
++    bool IsTrigger(const void* pBytecode, size_t Length) const;
++
++    /**
++     * \brief Whether the original bytecode is a shader that reads the depth + normal buffer at sampler 0
++     */
++    bool IsGBufferReader(const void* pBytecode, size_t Length) const;
++
++    /**
++     * \brief A draw with a G-buffer reader was recorded: \p pTexture is this frame's depth + normal buffer
++     */
++    void NoteGBuffer(IDirect3DBaseTexture9* pTexture);
++
++    /**
++     * \brief A draw with the trigger shader was recorded on \p pTarget
++     */
++    void Arm(D3D9Surface* pTarget);
++
++    bool IsPending() const {
++      return m_target != nullptr && !m_running;
++    }
++
++    /**
++     * \brief Runs SMAA on the armed target (call before the next draw, clear, copy or present)
++     */
++    void Run();
++
++    /**
++     * \brief Releases the default-pool resources, which would make a device reset fail
++     */
++    void ReleaseResources();
++
++  private:
++
++    D3D9DeviceEx*           m_device;
++    std::string             m_dir;
++    std::string             m_trigger;
++
++    D3D9Surface*            m_target   = nullptr;   // referenced while armed
++    bool                    m_running  = false;
++    bool                    m_failed   = false;     // missing files etc.: disabled, logged once
++    uint32_t                m_runs     = 0u;
++
++    // d3d9.postAAKey cycles the mode while playing: SMAA, off, show edges, show blending weights
++    enum Mode : uint32_t { ModeSmaa = 0, ModeOff = 1, ModeEdges = 2, ModeWeights = 3, ModeCount = 4 };
++    int32_t                 m_key      = 0;
++    bool                    m_keyDown  = false;
++    uint32_t                m_mode     = ModeSmaa;
++
++    // Private references (like DXVK's own state): a public reference to a resource would keep
++    // the whole device alive after the application releases it
++    Com<D3D9VertexShader, false> m_vs[3];
++    Com<D3D9PixelShader, false>  m_ps[3];
++    Com<D3D9PixelShader, false>  m_psGeometry;   // geometry-aware edges (optional file)
++    Com<D3D9Texture2D, false>    m_gbuffer;      // engine's depth + normal buffer of this frame
++    bool                         m_gbufferFresh = false;
++    bool                         m_geometryLogged = false;
++    std::vector<std::string>     m_gbufferShaders;
++    Com<D3D9Texture2D, false>    m_area;
++    Com<D3D9Texture2D, false>    m_search;
++
++    Com<D3D9Texture2D, false>    m_color;     // copy of the target
++    Com<D3D9Texture2D, false>    m_edges;
++    Com<D3D9Texture2D, false>    m_weights;
++    UINT                    m_width    = 0u;
++    UINT                    m_height   = 0u;
++    D3DFORMAT               m_format   = D3DFMT_UNKNOWN;
++
++    bool LoadShaders();
++
++    bool LoadTexture(const char* pName, UINT Width, UINT Height, Com<D3D9Texture2D, false>& Texture);
++
++    Com<D3D9Texture2D, false> CreateTexture(UINT Width, UINT Height, DWORD Usage, D3DFORMAT Format, D3DPOOL Pool);
++
++    bool PrepareTargets(UINT Width, UINT Height, D3DFORMAT Format);
++
++    void ReleaseTargets();
++
++    void Disable(const std::string& Reason);
++
++    void PollKey();
++
++    static std::vector<char> ReadFile(const std::string& Path);
++
++    template<typename T>
++    static void SafeRelease(T*& p) {
++      if (p) {
++        p->Release();
++        p = nullptr;
++      }
++    }
++
++    // Keeps a newly created object by a private reference only and drops the public one
++    template<typename T, typename I>
++    static Com<T, false> Private(I* pObject) {
++      Com<T, false> result = static_cast<T*>(pObject);
++      if (pObject)
++        pObject->Release();
++      return result;
++    }
++
++  };
++
++}
+diff --git a/src/d3d9/d3d9_shader.h b/src/d3d9/d3d9_shader.h
+index 489fc82..d3ea54d 100644
+--- a/src/d3d9/d3d9_shader.h
++++ b/src/d3d9/d3d9_shader.h
+@@ -202,6 +202,22 @@ namespace dxvk {
+       m_censusId = Id;
+     }
+ 
++    bool IsPostTrigger() const {
++      return m_postTrigger;
++    }
++
++    void SetPostTrigger(bool Trigger) {
++      m_postTrigger = Trigger;
++    }
++
++    bool IsPostGBufferReader() const {
++      return m_postGBufferReader;
++    }
++
++    void SetPostGBufferReader(bool Reader) {
++      m_postGBufferReader = Reader;
++    }
++
+   private:
+ 
+     D3D9CommonShader m_shader;
+@@ -209,6 +225,8 @@ namespace dxvk {
+     MemoryFileRegion m_bytecode;
+     uint32_t         m_bytecodeLength;
+     uint32_t         m_censusId = 0u;
++    bool             m_postTrigger = false;
++    bool             m_postGBufferReader = false;
+ 
+   };
+ 
+diff --git a/src/d3d9/meson.build b/src/d3d9/meson.build
+index d40d0d9..edb57f2 100644
+--- a/src/d3d9/meson.build
++++ b/src/d3d9/meson.build
+@@ -42,6 +42,7 @@ d3d9_src = [
+   'd3d9_parallel_copy.cpp',
+   'd3d9_frame_census.cpp',
+   'd3d9_shader_override.cpp',
++  'd3d9_post_aa.cpp',
+   'd3d9_fixed_function.cpp',
+   'd3d9_names.cpp',
+   'd3d9_swvp_emu.cpp',
