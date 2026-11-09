@@ -1,0 +1,5313 @@
+{
+  "_about": [
+    "Mage Skills Expansion: balance and registration of the new skills. Edit numbers here, then rebuild:",
+    "  py -3 -I MageExpansion\\tools\\build_mage.py <game dir> MageExpansion\\build",
+    "uuid      - skill name from the exe table (0x89D560). Stage 2a: a free name (Chain Hit 0x0E / Newt 0x39);",
+    "            the game stores the skill under this name's number (hotbar, save).",
+    "name      - shown name (English) and the localisation key.",
+    "code_path - existing skill class that runs the skill (exe has no data-driven behaviour).",
+    "ranks     - mana = EnduranceCost, cooldown = seconds, level = hero level for the rank, params = ParamN of the class",
+    "            (Magic Missile: Param1 = missiles per cast, Param2 = damage per missile; [N] in the text = ParamN).",
+    "            Fireball, from its own description: Param3 = magic damage, Param5 = radius in metres, Param10 = % chance",
+    "            to set on fire; Param1/2/4/6/7/8/9/11 not known - kept as in Fireball (Param11 = 0 as in its rank 16).",
+    "Div2Fix [MageSkills] gives the hero the skill (Grant = exe ids) and shows its own icon (skillbutton_<uuid>_*).",
+    "All numbers are EXPERIMENTAL until checked in game (docs/BALANCE.md)."
+  ],
+  "tree_moves": [
+    { "_about": "09.11 the user: Contagious Curse right of Curse, this column moves down one cell", "uuid": "Blind", "tree": [4, 1] },
+    { "uuid": "Transmute Consumables", "tree": [5, 1] },
+    { "uuid": "Way of the Wise Wizard", "tree": [6, 1] }
+  ],
+  "skills": [
+    {
+      "id": "IceBolt",
+      "stage": "2a + 2b: Fireball code, 15 ranks, teacher upgrades, own icon/effects, slow and high-rank freeze",
+      "uuid": "Chain Hit",
+      "name": "Ice Bolt",
+      "code_path": "Fireball",
+      "tree": [
+        6,
+        2
+      ],
+      "default_level": 0,
+      "icon": {
+        "from": "MagicMissile",
+        "art": "ice_bolt",
+        "saturation": 0.75,
+        "green": 1.1
+      },
+      "tree_icon_from": "Magic Missile",
+      "description": "You hurl a bolt of ice at your target, dealing [3] points of magic damage and slowing it down by 30% for 2 seconds (+5% and +0.25 s per rank above the first, up to 80% and 5.5 s at rank 15). From rank 11 the bolt has a 25% chance to freeze the target in place for 0.75 seconds.",
+      "lyrical": "A shard of winter's breath, given shape by a mage's will and hurled at a foe. Simple, swift and cold.",
+      "ru": {
+        "name": "Ледяной снаряд - активный навык",
+        "description": "Вы бросаете в цель ледяной снаряд, который наносит [3] очков магического урона и замедляет её на 30% на 2 секунды (+5% и +0,25 с за каждый ранг после первого, до 80% и 5,5 с на 15-м ранге). С 11-го ранга снаряд с шансом 25% замораживает цель на месте на 0,75 секунды.",
+        "lyrical": "Осколок зимнего дыхания, которому воля мага придала форму. Простое, быстрое и холодное заклинание."
+      },
+      "ranks": [
+        {
+          "level": 3,
+          "mana": 10,
+          "cooldown": 4,
+          "params": {
+            "Param1": 60,
+            "Param2": 2,
+            "Param3": 14,
+            "Param4": 0,
+            "Param5": 1,
+            "Param6": 0.5,
+            "Param7": 0,
+            "Param8": -1,
+            "Param9": 50,
+            "Param10": 0,
+            "Param11": 0
+          }
+        },
+        {
+          "level": 7,
+          "mana": 14,
+          "cooldown": 4,
+          "params": {
+            "Param1": 60,
+            "Param2": 2,
+            "Param3": 32,
+            "Param4": 0,
+            "Param5": 1,
+            "Param6": 0.5,
+            "Param7": 0,
+            "Param8": -1,
+            "Param9": 50,
+            "Param10": 0,
+            "Param11": 0
+          }
+        },
+        {
+          "level": 11,
+          "mana": 18,
+          "cooldown": 4,
+          "params": {
+            "Param1": 60,
+            "Param2": 2,
+            "Param3": 55,
+            "Param4": 0,
+            "Param5": 1,
+            "Param6": 0.5,
+            "Param7": 0,
+            "Param8": -1,
+            "Param9": 50,
+            "Param10": 0,
+            "Param11": 0
+          }
+        },
+        {
+          "level": 14,
+          "mana": 22,
+          "cooldown": 4,
+          "params": {
+            "Param1": 60,
+            "Param2": 2,
+            "Param3": 120,
+            "Param4": 0,
+            "Param5": 1,
+            "Param6": 0.5,
+            "Param7": 0,
+            "Param8": -1,
+            "Param9": 50,
+            "Param10": 0,
+            "Param11": 0
+          }
+        },
+        {
+          "level": 17,
+          "mana": 26,
+          "cooldown": 4,
+          "params": {
+            "Param1": 60,
+            "Param2": 2,
+            "Param3": 190,
+            "Param4": 0,
+            "Param5": 1,
+            "Param6": 0.5,
+            "Param7": 0,
+            "Param8": -1,
+            "Param9": 50,
+            "Param10": 0,
+            "Param11": 0
+          }
+        },
+        {
+          "level": 19,
+          "mana": 27,
+          "cooldown": 4,
+          "params": {
+            "Param1": 60,
+            "Param2": 2,
+            "Param3": 235,
+            "Param4": 0,
+            "Param5": 1,
+            "Param6": 0.5,
+            "Param7": 0,
+            "Param8": -1,
+            "Param9": 50,
+            "Param10": 0,
+            "Param11": 0
+          }
+        },
+        {
+          "level": 22,
+          "mana": 32,
+          "cooldown": 4,
+          "params": {
+            "Param1": 60,
+            "Param2": 2,
+            "Param3": 285,
+            "Param4": 0,
+            "Param5": 1,
+            "Param6": 0.5,
+            "Param7": 0,
+            "Param8": -1,
+            "Param9": 50,
+            "Param10": 0,
+            "Param11": 0
+          }
+        },
+        {
+          "level": 24,
+          "mana": 37,
+          "cooldown": 4,
+          "params": {
+            "Param1": 60,
+            "Param2": 2,
+            "Param3": 340,
+            "Param4": 0,
+            "Param5": 1,
+            "Param6": 0.5,
+            "Param7": 0,
+            "Param8": -1,
+            "Param9": 50,
+            "Param10": 0,
+            "Param11": 0
+          }
+        },
+        {
+          "level": 27,
+          "mana": 42,
+          "cooldown": 4,
+          "params": {
+            "Param1": 60,
+            "Param2": 2,
+            "Param3": 525,
+            "Param4": 0,
+            "Param5": 1,
+            "Param6": 0.5,
+            "Param7": 0,
+            "Param8": -1,
+            "Param9": 50,
+            "Param10": 0,
+            "Param11": 0
+          }
+        },
+        {
+          "level": 30,
+          "mana": 47,
+          "cooldown": 4,
+          "params": {
+            "Param1": 60,
+            "Param2": 2,
+            "Param3": 640,
+            "Param4": 0,
+            "Param5": 1,
+            "Param6": 0.5,
+            "Param7": 0,
+            "Param8": -1,
+            "Param9": 50,
+            "Param10": 0,
+            "Param11": 0
+          }
+        },
+        {
+          "level": 32,
+          "mana": 52,
+          "cooldown": 4,
+          "params": {
+            "Param1": 60,
+            "Param2": 2,
+            "Param3": 725,
+            "Param4": 0,
+            "Param5": 1,
+            "Param6": 0.5,
+            "Param7": 0,
+            "Param8": -1,
+            "Param9": 50,
+            "Param10": 0,
+            "Param11": 0
+          }
+        },
+        {
+          "level": 35,
+          "mana": 57,
+          "cooldown": 4,
+          "params": {
+            "Param1": 60,
+            "Param2": 2,
+            "Param3": 860,
+            "Param4": 0,
+            "Param5": 1,
+            "Param6": 0.5,
+            "Param7": 0,
+            "Param8": -1,
+            "Param9": 50,
+            "Param10": 0,
+            "Param11": 0
+          }
+        },
+        {
+          "level": 37,
+          "mana": 62,
+          "cooldown": 4,
+          "params": {
+            "Param1": 60,
+            "Param2": 2,
+            "Param3": 955,
+            "Param4": 0,
+            "Param5": 1,
+            "Param6": 0.5,
+            "Param7": 0,
+            "Param8": -1,
+            "Param9": 50,
+            "Param10": 0,
+            "Param11": 0
+          }
+        },
+        {
+          "level": 39,
+          "mana": 67,
+          "cooldown": 4,
+          "params": {
+            "Param1": 60,
+            "Param2": 2,
+            "Param3": 1060,
+            "Param4": 0,
+            "Param5": 1,
+            "Param6": 0.5,
+            "Param7": 0,
+            "Param8": -1,
+            "Param9": 50,
+            "Param10": 0,
+            "Param11": 0
+          }
+        },
+        {
+          "level": 41,
+          "mana": 72,
+          "cooldown": 4,
+          "params": {
+            "Param1": 60,
+            "Param2": 2,
+            "Param3": 1115,
+            "Param4": 0,
+            "Param5": 1,
+            "Param6": 0.5,
+            "Param7": 0,
+            "Param8": -1,
+            "Param9": 50,
+            "Param10": 0,
+            "Param11": 0
+          }
+        }
+      ],
+      "trainer": [
+        {
+          "max_level": 10,
+          "gold": 1500,
+          "required_level": 17,
+          "description": "You will be able to study Ice Bolt in more detail.",
+          "available": true
+        },
+        {
+          "max_level": 13,
+          "gold": 5000,
+          "required_level": 27,
+          "description": "You will be able to take Ice Bolt to new extremes.",
+          "available": true
+        },
+        {
+          "max_level": 15,
+          "gold": 10000,
+          "required_level": 32,
+          "description": "You will be able to become a master of Ice Bolt.",
+          "available": true
+        }
+      ],
+      "own_effects": [
+        {
+          "_about": "03.11: made from code by tools/fx_icebolt.py (was the Fireball's recoloured); Div2Fix Fx14 travel",
+          "name": "IceBolt_Travel",
+          "builder": "ice_travel",
+          "rows_from": "Player_Fireball"
+        },
+        {
+          "_about": "03.11: made from code by tools/fx_icebolt.py; Div2Fix Fx14 impact",
+          "name": "IceBolt_Impact",
+          "builder": "ice_impact",
+          "rows_from": "FireBall_Impact"
+        },
+        {
+          "_about": "03.11: made from code by tools/fx_icebolt.py; Div2Fix Fx14 cast",
+          "name": "IceBolt_Cast",
+          "builder": "ice_cast",
+          "rows_from": "FireBall_Cast"
+        },
+        {
+          "_about": "03.11: one puff of the trail, started in the world along the flight by Div2Fix OwnTrail14",
+          "name": "IceBolt_Trail",
+          "builder": "ice_trail",
+          "rows_from": "FireBall_Cast"
+        },
+        {
+          "_about": "04.11: on a slowed enemy, moved with it by Div2Fix SlowFx14 (also Frost Nova's mark, OwnHitFx57)",
+          "name": "IceBolt_Slowed",
+          "builder": "ice_slowed",
+          "rows_from": "FireBall_Cast"
+        },
+        {
+          "_about": "04.11: on a frozen enemy, moved with it by Div2Fix FreezeFx14",
+          "name": "IceBolt_Frozen",
+          "builder": "ice_frozen",
+          "rows_from": "FireBall_Cast"
+        },
+        {
+          "_about": "06.11 Ice Arrow's flight: IceBolt_Travel's frost trail without the crystal; Div2Fix ice_arrow_fx",
+          "name": "IceArrow_Travel",
+          "builder": "ice_travel",
+          "rows_from": "Player_Fireball",
+          "args": {
+            "trail_only": true
+          }
+        },
+        {
+          "_about": "06.11 Ice Arrow's cast: the game's Arrow_Poison_Cast in ice colours with snowflakes; Div2Fix ice_cast_fx",
+          "name": "IceArrow_Cast",
+          "builder": "ice_arrow_cast",
+          "rows_from": "Arrow_Poison_Cast",
+          "tint_textures": {
+            "fx_bow_ice_b": {
+              "from": "fx_bow_poison_b",
+              "matrix": [
+                [
+                  0.5,
+                  0.3,
+                  0.1
+                ],
+                [
+                  0.4,
+                  0.6,
+                  0.2
+                ],
+                [
+                  0.3,
+                  0.8,
+                  0.6
+                ]
+              ]
+            }
+          }
+        },
+        {
+          "_about": "06.11 Ice Arrow's hit: IceBolt_Impact without the crystal shards; Div2Fix ice_arrow_fx",
+          "name": "IceArrow_Impact",
+          "builder": "ice_impact",
+          "rows_from": "FireBall_Impact",
+          "args": {
+            "no_shards": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "FrostNova",
+      "stage": "own skill (no other skill code): CodePath Newt (behaviour 0x39, no branch in the hero cast switch 0x924440); Div2Fix Own57=1 takes the cast: check, mana, cooldown; effect/damage/visuals are next stages. Param2 = damage (text [2]), Param3 = radius in metres",
+      "uuid": "Newt",
+      "name": "Frost Nova",
+      "code_path": "Newt",
+      "tree": [
+        5,
+        2
+      ],
+      "default_level": 0,
+      "icon": {
+        "from": "MagicMissile",
+        "art": "frost_nova",
+        "saturation": 0.75,
+        "green": 1.1
+      },
+      "description": "You release a wave of frost that deals [2] points of magic damage to all enemies within [3] meters around you.",
+      "lyrical": "For a heartbeat the air around the mage turns to winter, and everything close enough to feel it pays the price.",
+      "ru": {
+        "name": "Морозная вспышка - активный навык",
+        "description": "Вы выпускаете волну холода, которая наносит [2] очков магического урона всем врагам вокруг вас в радиусе [3] м.",
+        "lyrical": "На миг воздух вокруг мага становится зимой, и всякий, кто оказался рядом, платит за это сполна."
+      },
+      "ranks": [
+        {
+          "level": 6,
+          "mana": 20,
+          "cooldown": 12,
+          "params": {
+            "Param1": 0,
+            "Param2": 30,
+            "Param3": 6
+          }
+        },
+        {
+          "level": 9,
+          "mana": 24,
+          "cooldown": 12,
+          "params": {
+            "Param1": 0,
+            "Param2": 50,
+            "Param3": 6
+          }
+        },
+        {
+          "level": 12,
+          "mana": 29,
+          "cooldown": 12,
+          "params": {
+            "Param1": 0,
+            "Param2": 100,
+            "Param3": 6
+          }
+        },
+        {
+          "level": 15,
+          "mana": 35,
+          "cooldown": 12,
+          "params": {
+            "Param1": 0,
+            "Param2": 200,
+            "Param3": 6
+          }
+        },
+        {
+          "level": 18,
+          "mana": 40,
+          "cooldown": 12,
+          "params": {
+            "Param1": 0,
+            "Param2": 280,
+            "Param3": 6
+          }
+        },
+        {
+          "level": 21,
+          "mana": 46,
+          "cooldown": 12,
+          "params": {
+            "Param1": 0,
+            "Param2": 375,
+            "Param3": 9
+          }
+        },
+        {
+          "level": 24,
+          "mana": 56,
+          "cooldown": 12,
+          "params": {
+            "Param1": 0,
+            "Param2": 485,
+            "Param3": 9
+          }
+        },
+        {
+          "level": 26,
+          "mana": 60,
+          "cooldown": 12,
+          "params": {
+            "Param1": 0,
+            "Param2": 690,
+            "Param3": 9
+          }
+        },
+        {
+          "level": 28,
+          "mana": 66,
+          "cooldown": 12,
+          "params": {
+            "Param1": 0,
+            "Param2": 850,
+            "Param3": 9
+          }
+        },
+        {
+          "level": 30,
+          "mana": 70,
+          "cooldown": 12,
+          "params": {
+            "Param1": 0,
+            "Param2": 965,
+            "Param3": 9
+          }
+        },
+        {
+          "level": 32,
+          "mana": 78,
+          "cooldown": 12,
+          "params": {
+            "Param1": 0,
+            "Param2": 1085,
+            "Param3": 12
+          }
+        },
+        {
+          "level": 34,
+          "mana": 83,
+          "cooldown": 12,
+          "params": {
+            "Param1": 0,
+            "Param2": 1220,
+            "Param3": 12
+          }
+        },
+        {
+          "level": 36,
+          "mana": 89,
+          "cooldown": 12,
+          "params": {
+            "Param1": 0,
+            "Param2": 1360,
+            "Param3": 12
+          }
+        },
+        {
+          "level": 38,
+          "mana": 97,
+          "cooldown": 12,
+          "params": {
+            "Param1": 0,
+            "Param2": 1515,
+            "Param3": 12
+          }
+        },
+        {
+          "level": 40,
+          "mana": 104,
+          "cooldown": 12,
+          "params": {
+            "Param1": 0,
+            "Param2": 1670,
+            "Param3": 12
+          }
+        }
+      ],
+      "_trainer_about": "03.11: the caps and prices of Magic Missile at the same trainers",
+      "trainer": [
+        {
+          "max_level": 10,
+          "gold": 1500,
+          "required_level": 17,
+          "description": "You will be able to study Frost Nova in more detail.",
+          "available": true
+        },
+        {
+          "max_level": 13,
+          "gold": 5000,
+          "required_level": 27,
+          "description": "You will be able to take Frost Nova to new extremes.",
+          "available": true
+        },
+        {
+          "max_level": 15,
+          "gold": 10000,
+          "required_level": 32,
+          "description": "You will be able to become a master of Frost Nova.",
+          "available": true
+        }
+      ],
+      "own_effects": [
+        {
+          "_about": "made from scratch by tools/fx_frostnova.py, 6 m (ranks: Div2Fix OwnFx57 name@rank)",
+          "name": "FrostNova_Burst6",
+          "builder": "frost_nova",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "radius": 600.0
+          }
+        },
+        {
+          "_about": "made from scratch by tools/fx_frostnova.py, 9 m (ranks: Div2Fix OwnFx57 name@rank)",
+          "name": "FrostNova_Burst9",
+          "builder": "frost_nova",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "radius": 900.0
+          }
+        },
+        {
+          "_about": "made from scratch by tools/fx_frostnova.py, 12 m (ranks: Div2Fix OwnFx57 name@rank)",
+          "name": "FrostNova_Burst12",
+          "builder": "frost_nova",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "radius": 1200.0
+          }
+        },
+        {
+          "_about": "the frost on every target (Div2Fix OwnHitFx57), tools/fx_frostnova.py Chill",
+          "name": "FrostNova_Chill",
+          "builder": "frost_nova_chill",
+          "rows_from": "MagicMissile_Impact"
+        }
+      ],
+      "own_animations": [
+        {
+          "_about": "made from code by tools/anim_frostnova.py on the hero's skeletons; a sequence in the 14 player KFMs",
+          "sequence": "Skill_FrostNova",
+          "builder": "frost_nova"
+        }
+      ]
+    },
+    {
+      "id": "ChainLightning",
+      "stage": "own skill: the free skill id 0x1C (no name in the exe: Div2Fix [MageSkills] Name28 gives \"Chain Lightning\" to 0x89D560), CodePath Newt (behaviour 0x39, the hero cast is Div2Fix own_cast); Param1 = jumps, Param2 = damage to the first enemy, Param3 = jump radius in metres; each jump deals OwnChain28 percent less",
+      "uuid": "Chain Lightning",
+      "name": "Chain Lightning",
+      "code_path": "Newt",
+      "tree": [
+        6,
+        3
+      ],
+      "default_level": 0,
+      "icon": {
+        "from": "MagicMissile",
+        "art": "chain_lightning",
+        "saturation": 0.75,
+        "green": 1.1
+      },
+      "description": "Lightning strikes the nearest enemy for [2] points of magic damage and leaps to up to [1] more enemies within [3] meters of each other; every leap deals less damage.",
+      "lyrical": "The mage does not throw the lightning so much as let it go; it finds its own way from one foe to the next.",
+      "ru": {
+        "name": "Цепная молния - активный навык",
+        "description": "Молния бьёт ближайшего врага на [2] ед. магического урона и перескакивает ещё на [1] врагов, находящихся в пределах [3] м друг от друга; с каждым прыжком урон уменьшается.",
+        "lyrical": "Маг не столько бросает молнию, сколько отпускает её: дальше она сама находит дорогу от одного врага к другому."
+      },
+      "ranks": [
+        {
+          "level": 6,
+          "mana": 22,
+          "cooldown": 10,
+          "params": {
+            "Param1": 2,
+            "Param2": 35,
+            "Param3": 8
+          }
+        },
+        {
+          "level": 9,
+          "mana": 26,
+          "cooldown": 10,
+          "params": {
+            "Param1": 2,
+            "Param2": 55,
+            "Param3": 8
+          }
+        },
+        {
+          "level": 12,
+          "mana": 32,
+          "cooldown": 10,
+          "params": {
+            "Param1": 2,
+            "Param2": 110,
+            "Param3": 8
+          }
+        },
+        {
+          "level": 15,
+          "mana": 38,
+          "cooldown": 10,
+          "params": {
+            "Param1": 2,
+            "Param2": 220,
+            "Param3": 8
+          }
+        },
+        {
+          "level": 18,
+          "mana": 44,
+          "cooldown": 10,
+          "params": {
+            "Param1": 2,
+            "Param2": 310,
+            "Param3": 8
+          }
+        },
+        {
+          "level": 21,
+          "mana": 51,
+          "cooldown": 10,
+          "params": {
+            "Param1": 3,
+            "Param2": 415,
+            "Param3": 10
+          }
+        },
+        {
+          "level": 24,
+          "mana": 62,
+          "cooldown": 10,
+          "params": {
+            "Param1": 3,
+            "Param2": 535,
+            "Param3": 10
+          }
+        },
+        {
+          "level": 26,
+          "mana": 66,
+          "cooldown": 10,
+          "params": {
+            "Param1": 3,
+            "Param2": 760,
+            "Param3": 10
+          }
+        },
+        {
+          "level": 28,
+          "mana": 73,
+          "cooldown": 10,
+          "params": {
+            "Param1": 3,
+            "Param2": 935,
+            "Param3": 10
+          }
+        },
+        {
+          "level": 30,
+          "mana": 77,
+          "cooldown": 10,
+          "params": {
+            "Param1": 3,
+            "Param2": 1060,
+            "Param3": 10
+          }
+        },
+        {
+          "level": 32,
+          "mana": 86,
+          "cooldown": 10,
+          "params": {
+            "Param1": 4,
+            "Param2": 1195,
+            "Param3": 12
+          }
+        },
+        {
+          "level": 34,
+          "mana": 91,
+          "cooldown": 10,
+          "params": {
+            "Param1": 4,
+            "Param2": 1340,
+            "Param3": 12
+          }
+        },
+        {
+          "level": 36,
+          "mana": 98,
+          "cooldown": 10,
+          "params": {
+            "Param1": 4,
+            "Param2": 1495,
+            "Param3": 12
+          }
+        },
+        {
+          "level": 38,
+          "mana": 107,
+          "cooldown": 10,
+          "params": {
+            "Param1": 4,
+            "Param2": 1665,
+            "Param3": 12
+          }
+        },
+        {
+          "level": 40,
+          "mana": 114,
+          "cooldown": 10,
+          "params": {
+            "Param1": 4,
+            "Param2": 1835,
+            "Param3": 12
+          }
+        }
+      ],
+      "_trainer_about": "03.11: the caps and prices of Magic Missile at the same trainers",
+      "trainer": [
+        {
+          "max_level": 10,
+          "gold": 1500,
+          "required_level": 17,
+          "description": "You will be able to study Chain Lightning in more detail.",
+          "available": true
+        },
+        {
+          "max_level": 13,
+          "gold": 5000,
+          "required_level": 27,
+          "description": "You will be able to take Chain Lightning to new extremes.",
+          "available": true
+        },
+        {
+          "max_level": 15,
+          "gold": 10000,
+          "required_level": 32,
+          "description": "You will be able to become a master of Chain Lightning.",
+          "available": true
+        }
+      ],
+      "own_effects": [
+        {
+          "_about": "04.11: the cast on the caster, made from code by tools/fx_chain.py (Cast); Div2Fix OwnFx28 (plays OwnAnim28 with it)",
+          "name": "ChainLightning_Cast",
+          "builder": "chain_cast",
+          "rows_from": "FireBall_Cast"
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 100 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam100",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 100.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 150 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam150",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 150.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 200 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam200",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 200.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 250 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam250",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 250.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 300 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam300",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 300.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 350 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam350",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 350.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 400 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam400",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 400.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 450 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam450",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 450.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 500 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam500",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 500.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 550 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam550",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 550.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 600 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam600",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 600.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 650 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam650",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 650.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 700 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam700",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 700.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 750 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam750",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 750.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 800 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam800",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 800.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 850 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam850",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 850.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 900 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam900",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 900.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 950 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam950",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 950.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 1000 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam1000",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 1000.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 1050 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam1050",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 1050.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 1100 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam1100",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 1100.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 1150 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam1150",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 1150.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 1200 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam1200",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 1200.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 1250 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam1250",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 1250.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 1300 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam1300",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 1300.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 1350 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam1350",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 1350.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 1400 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam1400",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 1400.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 1450 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam1450",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 1450.0
+          }
+        },
+        {
+          "_about": "made from code by tools/fx_chain.py, 1500 cm; Div2Fix OwnBeam28=ChainLightning_Beam*@100-1500/50 takes the shortest not shorter than the leap",
+          "name": "ChainLightning_Beam1500",
+          "builder": "chain_beam",
+          "rows_from": "FireBall_Cast",
+          "args": {
+            "length": 1500.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "ArcanePush",
+      "stage": "own skill: the free skill id 0x36, Div2Fix Name54, OwnPush54; Param1 = push metres, Param2 = damage, Param3 = radius",
+      "uuid": "Arcane Push",
+      "name": "Arcane Push",
+      "code_path": "Newt",
+      "tree": [
+        7,
+        2
+      ],
+      "default_level": 0,
+      "icon": {
+        "from": "MagicMissile",
+        "art": "arcane_push",
+        "saturation": 0.75,
+        "green": 1.1
+      },
+      "description": "A wave of force bursts from you, dealing [2] points of magic damage to all enemies within [3] meters, knocking them down and throwing them back up to [1] meters.",
+      "lyrical": "Magic need not burn or freeze; sometimes it simply asks the world to step back.",
+      "ru": {
+        "name": "Магический толчок - активный навык",
+        "description": "От вас расходится волна силы: она наносит [2] очков магического урона всем врагам в радиусе [3] м, сбивает их с ног и отбрасывает на расстояние до [1] м.",
+        "lyrical": "Магии не обязательно жечь или морозить: порой она просто просит мир отступить на шаг."
+      },
+      "ranks": [
+        {
+          "level": 6,
+          "mana": 16,
+          "cooldown": 12,
+          "params": {
+            "Param1": 6,
+            "Param2": 21,
+            "Param3": 5
+          }
+        },
+        {
+          "level": 9,
+          "mana": 19,
+          "cooldown": 12,
+          "params": {
+            "Param1": 6,
+            "Param2": 33,
+            "Param3": 5
+          }
+        },
+        {
+          "level": 12,
+          "mana": 24,
+          "cooldown": 12,
+          "params": {
+            "Param1": 6,
+            "Param2": 66,
+            "Param3": 5
+          }
+        },
+        {
+          "level": 15,
+          "mana": 28,
+          "cooldown": 12,
+          "params": {
+            "Param1": 7,
+            "Param2": 132,
+            "Param3": 5
+          }
+        },
+        {
+          "level": 18,
+          "mana": 33,
+          "cooldown": 12,
+          "params": {
+            "Param1": 7,
+            "Param2": 186,
+            "Param3": 5
+          }
+        },
+        {
+          "level": 21,
+          "mana": 38,
+          "cooldown": 12,
+          "params": {
+            "Param1": 8,
+            "Param2": 249,
+            "Param3": 6
+          }
+        },
+        {
+          "level": 24,
+          "mana": 46,
+          "cooldown": 12,
+          "params": {
+            "Param1": 8,
+            "Param2": 321,
+            "Param3": 6
+          }
+        },
+        {
+          "level": 26,
+          "mana": 49,
+          "cooldown": 12,
+          "params": {
+            "Param1": 9,
+            "Param2": 456,
+            "Param3": 6
+          }
+        },
+        {
+          "level": 28,
+          "mana": 54,
+          "cooldown": 12,
+          "params": {
+            "Param1": 9,
+            "Param2": 561,
+            "Param3": 6
+          }
+        },
+        {
+          "level": 30,
+          "mana": 57,
+          "cooldown": 12,
+          "params": {
+            "Param1": 9,
+            "Param2": 636,
+            "Param3": 6
+          }
+        },
+        {
+          "level": 32,
+          "mana": 64,
+          "cooldown": 12,
+          "params": {
+            "Param1": 10,
+            "Param2": 717,
+            "Param3": 7
+          }
+        },
+        {
+          "level": 34,
+          "mana": 68,
+          "cooldown": 12,
+          "params": {
+            "Param1": 10,
+            "Param2": 804,
+            "Param3": 7
+          }
+        },
+        {
+          "level": 36,
+          "mana": 73,
+          "cooldown": 12,
+          "params": {
+            "Param1": 11,
+            "Param2": 897,
+            "Param3": 7
+          }
+        },
+        {
+          "level": 38,
+          "mana": 80,
+          "cooldown": 12,
+          "params": {
+            "Param1": 11,
+            "Param2": 999,
+            "Param3": 7
+          }
+        },
+        {
+          "level": 40,
+          "mana": 85,
+          "cooldown": 12,
+          "params": {
+            "Param1": 12,
+            "Param2": 1101,
+            "Param3": 8
+          }
+        }
+      ],
+      "trainer": [
+        {
+          "max_level": 10,
+          "gold": 1500,
+          "required_level": 17,
+          "description": "You will be able to study Arcane Push in more detail.",
+          "available": true
+        },
+        {
+          "max_level": 13,
+          "gold": 5000,
+          "required_level": 27,
+          "description": "You will be able to take Arcane Push to new extremes.",
+          "available": true
+        },
+        {
+          "max_level": 15,
+          "gold": 10000,
+          "required_level": 32,
+          "description": "You will be able to become a master of Arcane Push.",
+          "available": true
+        }
+      ],
+      "own_effects": [
+        {
+          "_about": "on the caster, Div2Fix OwnFx54",
+          "name": "ArcanePush_Wave",
+          "builder": "push_wave",
+          "rows_from": "FireBall_Cast"
+        },
+        {
+          "_about": "on every enemy struck, Div2Fix OwnHitFx54",
+          "name": "ArcanePush_Hit",
+          "builder": "push_hit",
+          "rows_from": "FireBall_Cast"
+        },
+        {
+          "_about": "the wave at the feet, Div2Fix OwnPushFx54",
+          "name": "ArcanePush_Burst",
+          "builder": "push_burst",
+          "rows_from": "FireBall_Cast"
+        }
+      ],
+      "own_animations": [
+        {
+          "_about": "made from code by tools/anim_arcanepush.py; a sequence in the 14 player KFMs",
+          "sequence": "Skill_ArcanePush",
+          "builder": "arcane_push"
+        }
+      ]
+    },
+    {
+      "id": "ArcaneShield",
+      "stage": "own skill: a NEW skill id 0x60 (above the game's, to be proven in game), Div2Fix Name96, OwnShield96; Param1 = % absorbed, Param2 = seconds, Param3 = mana per 100 damage absorbed",
+      "uuid": "Arcane Shield",
+      "name": "Arcane Shield",
+      "code_path": "Newt",
+      "tree": [
+        7,
+        3
+      ],
+      "default_level": 0,
+      "icon": {
+        "from": "MagicMissile",
+        "art": "arcane_shield",
+        "saturation": 0.75,
+        "green": 1.1
+      },
+      "description": "A second skin of force covers you for [2] seconds, absorbing [1]% of the damage you take. Every 100 points absorbed cost [3] mana; when your mana runs out, the shield falls.",
+      "lyrical": "What the dragons wear by nature, a patient mage can weave for a little while.",
+      "ru": {
+        "name": "Магический щит - активный навык",
+        "description": "Вторая кожа из чистой силы покрывает вас на [2] с и поглощает [1]% получаемого урона. Каждые 100 поглощённых очков стоят [3] маны; когда мана кончается, щит спадает.",
+        "lyrical": "То, что драконам дано от природы, терпеливый маг может соткать на короткое время."
+      },
+      "ranks": [
+        {
+          "level": 6,
+          "mana": 11,
+          "cooldown": 30,
+          "params": {
+            "Param1": 40,
+            "Param2": 10,
+            "Param3": 60
+          }
+        },
+        {
+          "level": 9,
+          "mana": 13,
+          "cooldown": 30,
+          "params": {
+            "Param1": 42,
+            "Param2": 10,
+            "Param3": 58
+          }
+        },
+        {
+          "level": 12,
+          "mana": 16,
+          "cooldown": 30,
+          "params": {
+            "Param1": 45,
+            "Param2": 11,
+            "Param3": 56
+          }
+        },
+        {
+          "level": 15,
+          "mana": 19,
+          "cooldown": 30,
+          "params": {
+            "Param1": 48,
+            "Param2": 12,
+            "Param3": 54
+          }
+        },
+        {
+          "level": 18,
+          "mana": 22,
+          "cooldown": 30,
+          "params": {
+            "Param1": 51,
+            "Param2": 12,
+            "Param3": 52
+          }
+        },
+        {
+          "level": 21,
+          "mana": 25,
+          "cooldown": 30,
+          "params": {
+            "Param1": 54,
+            "Param2": 13,
+            "Param3": 50
+          }
+        },
+        {
+          "level": 24,
+          "mana": 31,
+          "cooldown": 30,
+          "params": {
+            "Param1": 57,
+            "Param2": 14,
+            "Param3": 48
+          }
+        },
+        {
+          "level": 26,
+          "mana": 33,
+          "cooldown": 30,
+          "params": {
+            "Param1": 60,
+            "Param2": 15,
+            "Param3": 45
+          }
+        },
+        {
+          "level": 28,
+          "mana": 36,
+          "cooldown": 30,
+          "params": {
+            "Param1": 62,
+            "Param2": 15,
+            "Param3": 43
+          }
+        },
+        {
+          "level": 30,
+          "mana": 38,
+          "cooldown": 30,
+          "params": {
+            "Param1": 65,
+            "Param2": 16,
+            "Param3": 41
+          }
+        },
+        {
+          "level": 32,
+          "mana": 43,
+          "cooldown": 30,
+          "params": {
+            "Param1": 68,
+            "Param2": 17,
+            "Param3": 39
+          }
+        },
+        {
+          "level": 34,
+          "mana": 45,
+          "cooldown": 30,
+          "params": {
+            "Param1": 71,
+            "Param2": 17,
+            "Param3": 37
+          }
+        },
+        {
+          "level": 36,
+          "mana": 49,
+          "cooldown": 30,
+          "params": {
+            "Param1": 74,
+            "Param2": 18,
+            "Param3": 35
+          }
+        },
+        {
+          "level": 38,
+          "mana": 53,
+          "cooldown": 30,
+          "params": {
+            "Param1": 77,
+            "Param2": 19,
+            "Param3": 33
+          }
+        },
+        {
+          "level": 40,
+          "mana": 57,
+          "cooldown": 30,
+          "params": {
+            "Param1": 80,
+            "Param2": 20,
+            "Param3": 30
+          }
+        }
+      ],
+      "trainer": [
+        {
+          "max_level": 10,
+          "gold": 1500,
+          "required_level": 17,
+          "description": "You will be able to study Arcane Shield in more detail.",
+          "available": true
+        },
+        {
+          "max_level": 13,
+          "gold": 5000,
+          "required_level": 27,
+          "description": "You will be able to take Arcane Shield to new extremes.",
+          "available": true
+        },
+        {
+          "max_level": 15,
+          "gold": 10000,
+          "required_level": 32,
+          "description": "You will be able to become a master of Arcane Shield.",
+          "available": true
+        }
+      ],
+      "own_effects": [
+        {
+          "_about": "on the caster, Div2Fix OwnFx96",
+          "name": "ArcaneShield_Cast",
+          "builder": "shield_cast",
+          "rows_from": "FireBall_Cast"
+        },
+        {
+          "_about": "at a hit and at the end, Div2Fix OwnShield96",
+          "name": "ArcaneShield_Hit",
+          "builder": "shield_hit",
+          "rows_from": "FireBall_Cast"
+        }
+      ]
+    },
+    {
+      "id": "SpellCritical",
+      "stage": "own passive: a NEW skill id 0x61, Div2Fix Name97, hk_takeHit; Param1 = % chance",
+      "uuid": "Spell Critical",
+      "name": "Spell Critical",
+      "code_path": "Death Blow",
+      "tree": [
+        8,
+        2
+      ],
+      "default_level": 0,
+      "icon": {
+        "from": "MagicMissile",
+        "art": "spell_critical",
+        "saturation": 0.75,
+        "green": 1.1
+      },
+      "description": "Your spells have a [1]% chance of doing double damage.",
+      "lyrical": "Sometimes a spell finds the seam in the world, and the world pays for it.",
+      "ru": {
+        "name": "Магический крит - пассивный навык",
+        "description": "Ваши заклинания с вероятностью [1]% наносят двойной урон.",
+        "lyrical": "Иногда заклинание находит шов в ткани мира, и мир за это платит."
+      },
+      "ranks": [
+        {
+          "level": 6,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 3
+          }
+        },
+        {
+          "level": 9,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 5
+          }
+        },
+        {
+          "level": 12,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 7
+          }
+        },
+        {
+          "level": 15,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 9
+          }
+        },
+        {
+          "level": 18,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 11
+          }
+        },
+        {
+          "level": 21,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 13
+          }
+        },
+        {
+          "level": 24,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 15
+          }
+        },
+        {
+          "level": 26,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 16
+          }
+        },
+        {
+          "level": 28,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 18
+          }
+        },
+        {
+          "level": 30,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 20
+          }
+        },
+        {
+          "level": 32,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 22
+          }
+        },
+        {
+          "level": 34,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 24
+          }
+        },
+        {
+          "level": 36,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 26
+          }
+        },
+        {
+          "level": 38,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 28
+          }
+        },
+        {
+          "level": 40,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 30
+          }
+        }
+      ],
+      "trainer": [
+        {
+          "max_level": 10,
+          "gold": 1500,
+          "required_level": 17,
+          "description": "You will be able to study Spell Critical in more detail.",
+          "available": true
+        },
+        {
+          "max_level": 13,
+          "gold": 5000,
+          "required_level": 27,
+          "description": "You will be able to take Spell Critical to new extremes.",
+          "available": true
+        },
+        {
+          "max_level": 15,
+          "gold": 10000,
+          "required_level": 32,
+          "description": "You will be able to become a master of Spell Critical.",
+          "available": true
+        }
+      ]
+    },
+    {
+      "id": "HuntersMark",
+      "stage": "runs on the game's Ranger Surprise code: Param1..3 its penalties (0), Param4 seconds, Param5 % more damage; Div2Fix MarkSkill=98, Name98",
+      "uuid": "Hunters Mark",
+      "name": "Hunter's Mark",
+      "code_path": "Ranger Surprise",
+      "tree": [
+        4,
+        7
+      ],
+      "default_level": 0,
+      "icon": {
+        "from": "MagicMissile",
+        "art": "hunters_mark",
+        "saturation": 0.75,
+        "green": 1.1
+      },
+      "description": "You shoot an arrow that does no damage but marks your target: for [4] seconds it takes [5]% more damage from every source.",
+      "lyrical": "Once the hunter has chosen, the prey has nowhere left to hide.",
+      "ru": {
+        "name": "Метка охотника - активный навык",
+        "description": "Вы выпускаете стрелу без урона, которая отмечает цель: [4] с она получает на [5]% больше урона от любых источников.",
+        "lyrical": "Когда охотник выбрал добычу, ей уже негде укрыться."
+      },
+      "ranks": [
+        {
+          "level": 6,
+          "mana": 12,
+          "cooldown": 25,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 0,
+            "Param4": 8,
+            "Param5": 10
+          }
+        },
+        {
+          "level": 9,
+          "mana": 15,
+          "cooldown": 25,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 0,
+            "Param4": 9,
+            "Param5": 12
+          }
+        },
+        {
+          "level": 12,
+          "mana": 17,
+          "cooldown": 25,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 0,
+            "Param4": 9,
+            "Param5": 14
+          }
+        },
+        {
+          "level": 15,
+          "mana": 20,
+          "cooldown": 25,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 0,
+            "Param4": 10,
+            "Param5": 15
+          }
+        },
+        {
+          "level": 18,
+          "mana": 23,
+          "cooldown": 25,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 0,
+            "Param4": 11,
+            "Param5": 17
+          }
+        },
+        {
+          "level": 21,
+          "mana": 26,
+          "cooldown": 25,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 0,
+            "Param4": 12,
+            "Param5": 19
+          }
+        },
+        {
+          "level": 24,
+          "mana": 28,
+          "cooldown": 25,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 0,
+            "Param4": 12,
+            "Param5": 21
+          }
+        },
+        {
+          "level": 26,
+          "mana": 31,
+          "cooldown": 25,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 0,
+            "Param4": 13,
+            "Param5": 22
+          }
+        },
+        {
+          "level": 28,
+          "mana": 34,
+          "cooldown": 25,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 0,
+            "Param4": 14,
+            "Param5": 24
+          }
+        },
+        {
+          "level": 30,
+          "mana": 36,
+          "cooldown": 25,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 0,
+            "Param4": 14,
+            "Param5": 26
+          }
+        },
+        {
+          "level": 32,
+          "mana": 39,
+          "cooldown": 25,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 0,
+            "Param4": 15,
+            "Param5": 28
+          }
+        },
+        {
+          "level": 34,
+          "mana": 42,
+          "cooldown": 25,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 0,
+            "Param4": 16,
+            "Param5": 30
+          }
+        },
+        {
+          "level": 36,
+          "mana": 45,
+          "cooldown": 25,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 0,
+            "Param4": 17,
+            "Param5": 31
+          }
+        },
+        {
+          "level": 38,
+          "mana": 47,
+          "cooldown": 25,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 0,
+            "Param4": 17,
+            "Param5": 33
+          }
+        },
+        {
+          "level": 40,
+          "mana": 50,
+          "cooldown": 25,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 0,
+            "Param4": 18,
+            "Param5": 35
+          }
+        }
+      ],
+      "trainer": [
+        {
+          "max_level": 10,
+          "gold": 1500,
+          "required_level": 17,
+          "description": "You will be able to study Hunter's Mark in more detail.",
+          "available": true
+        },
+        {
+          "max_level": 13,
+          "gold": 5000,
+          "required_level": 27,
+          "description": "You will be able to take Hunter's Mark to new extremes.",
+          "available": true
+        },
+        {
+          "max_level": 15,
+          "gold": 10000,
+          "required_level": 32,
+          "description": "You will be able to become a master of Hunter's Mark.",
+          "available": true
+        }
+      ]
+    },
+    {
+      "id": "SecondWind",
+      "stage": "own passive: id 0x63, Div2Fix Name99, WindSkill=99, WindFx; Param1 % healed, Param2 % less damage, Param3 seconds, Param4 seconds between",
+      "uuid": "Second Wind",
+      "name": "Second Wind",
+      "code_path": "Death Blow",
+      "tree": [
+        6,
+        4
+      ],
+      "default_level": 0,
+      "icon": {
+        "from": "MagicMissile",
+        "art": "second_wind",
+        "saturation": 0.75,
+        "green": 1.1
+      },
+      "description": "When a blow leaves you under 25% health, you heal [1]% of your health and take [2]% less damage for [3] seconds. This can happen once every [4] seconds.",
+      "lyrical": "The fallen are those who stopped getting up.",
+      "ru": {
+        "name": "Второе дыхание - пассивный навык",
+        "description": "Когда удар оставляет вас ниже 25% здоровья, вы восстанавливаете [1]% здоровья и [3] с получаете на [2]% меньше урона. Срабатывает не чаще раза в [4] с.",
+        "lyrical": "Падают те, кто перестал подниматься."
+      },
+      "ranks": [
+        {
+          "level": 6,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 15,
+            "Param2": 10,
+            "Param3": 5,
+            "Param4": 120
+          }
+        },
+        {
+          "level": 9,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 17,
+            "Param2": 11,
+            "Param3": 5,
+            "Param4": 116
+          }
+        },
+        {
+          "level": 12,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 19,
+            "Param2": 13,
+            "Param3": 5,
+            "Param4": 111
+          }
+        },
+        {
+          "level": 15,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 20,
+            "Param2": 14,
+            "Param3": 5,
+            "Param4": 107
+          }
+        },
+        {
+          "level": 18,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 22,
+            "Param2": 16,
+            "Param3": 5,
+            "Param4": 103
+          }
+        },
+        {
+          "level": 21,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 24,
+            "Param2": 17,
+            "Param3": 5,
+            "Param4": 99
+          }
+        },
+        {
+          "level": 24,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 26,
+            "Param2": 19,
+            "Param3": 5,
+            "Param4": 94
+          }
+        },
+        {
+          "level": 26,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 28,
+            "Param2": 20,
+            "Param3": 5,
+            "Param4": 90
+          }
+        },
+        {
+          "level": 28,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 29,
+            "Param2": 21,
+            "Param3": 5,
+            "Param4": 86
+          }
+        },
+        {
+          "level": 30,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 31,
+            "Param2": 23,
+            "Param3": 5,
+            "Param4": 81
+          }
+        },
+        {
+          "level": 32,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 33,
+            "Param2": 24,
+            "Param3": 5,
+            "Param4": 77
+          }
+        },
+        {
+          "level": 34,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 35,
+            "Param2": 26,
+            "Param3": 5,
+            "Param4": 73
+          }
+        },
+        {
+          "level": 36,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 36,
+            "Param2": 27,
+            "Param3": 5,
+            "Param4": 69
+          }
+        },
+        {
+          "level": 38,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 38,
+            "Param2": 29,
+            "Param3": 5,
+            "Param4": 64
+          }
+        },
+        {
+          "level": 40,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 40,
+            "Param2": 30,
+            "Param3": 5,
+            "Param4": 60
+          }
+        }
+      ],
+      "trainer": [
+        {
+          "max_level": 10,
+          "gold": 1500,
+          "required_level": 17,
+          "description": "You will be able to study Second Wind in more detail.",
+          "available": true
+        },
+        {
+          "max_level": 13,
+          "gold": 5000,
+          "required_level": 27,
+          "description": "You will be able to take Second Wind to new extremes.",
+          "available": true
+        },
+        {
+          "max_level": 15,
+          "gold": 10000,
+          "required_level": 32,
+          "description": "You will be able to become a master of Second Wind.",
+          "available": true
+        }
+      ],
+      "own_effects": [
+        {
+          "_about": "on the hero, Div2Fix WindFx",
+          "name": "SecondWind_Burst",
+          "builder": "wind_burst",
+          "rows_from": "FireBall_Cast"
+        }
+      ]
+    },
+    {
+      "id": "PackHunger",
+      "stage": "own passive: id 0x64, Div2Fix Name100, HungerSkill=100; Param1 % of the damage healed",
+      "uuid": "Pack Hunger",
+      "name": "Pack Hunger",
+      "code_path": "Death Blow",
+      "tree": [
+        7,
+        0
+      ],
+      "default_level": 0,
+      "icon": {
+        "from": "MagicMissile",
+        "art": "pack_hunger",
+        "saturation": 0.75,
+        "green": 1.1
+      },
+      "description": "Your summoned creatures heal themselves for [1]% of the damage they deal.",
+      "lyrical": "What you call from the dark comes back hungrier each time.",
+      "ru": {
+        "name": "Жажда стаи - пассивный навык",
+        "description": "Призванные вами существа восстанавливают здоровье на [1]% от нанесённого ими урона.",
+        "lyrical": "То, что вы зовёте из тьмы, с каждым разом возвращается всё голоднее."
+      },
+      "ranks": [
+        {
+          "level": 6,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 10
+          }
+        },
+        {
+          "level": 9,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 12
+          }
+        },
+        {
+          "level": 12,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 14
+          }
+        },
+        {
+          "level": 15,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 16
+          }
+        },
+        {
+          "level": 18,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 19
+          }
+        },
+        {
+          "level": 21,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 21
+          }
+        },
+        {
+          "level": 24,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 23
+          }
+        },
+        {
+          "level": 26,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 25
+          }
+        },
+        {
+          "level": 28,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 27
+          }
+        },
+        {
+          "level": 30,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 29
+          }
+        },
+        {
+          "level": 32,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 31
+          }
+        },
+        {
+          "level": 34,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 34
+          }
+        },
+        {
+          "level": 36,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 36
+          }
+        },
+        {
+          "level": 38,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 38
+          }
+        },
+        {
+          "level": 40,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 40
+          }
+        }
+      ],
+      "trainer": [
+        {
+          "max_level": 10,
+          "gold": 1500,
+          "required_level": 17,
+          "description": "You will be able to study Pack Hunger in more detail.",
+          "available": true
+        },
+        {
+          "max_level": 13,
+          "gold": 5000,
+          "required_level": 27,
+          "description": "You will be able to take Pack Hunger to new extremes.",
+          "available": true
+        },
+        {
+          "max_level": 15,
+          "gold": 10000,
+          "required_level": 32,
+          "description": "You will be able to become a master of Pack Hunger.",
+          "available": true
+        }
+      ]
+    },
+    {
+      "id": "HolySmite",
+      "stage": "own skill: id 0x65, Div2Fix Name101, OwnSmite101; Param1 % healed, Param2 damage, Param3 metres",
+      "uuid": "Holy Smite",
+      "name": "Holy Smite",
+      "code_path": "Newt",
+      "tree": [
+        9,
+        3
+      ],
+      "default_level": 0,
+      "icon": {
+        "from": "MagicMissile",
+        "art": "holy_smite",
+        "saturation": 0.75,
+        "green": 1.1
+      },
+      "description": "Light falls on the enemy you target, up to [3] meters away, for [2] points of magic damage; [1]% of the damage heals you.",
+      "lyrical": "Light does not ask whether you deserve it.",
+      "ru": {
+        "name": "Святая кара - активный навык",
+        "description": "Свет падает на выбранного врага на расстоянии до [3] м и наносит [2] магического урона; [1]% урона лечит вас.",
+        "lyrical": "Свет не спрашивает, заслужили ли вы его."
+      },
+      "ranks": [
+        {
+          "level": 6,
+          "mana": 15,
+          "cooldown": 12,
+          "params": {
+            "Param1": 20,
+            "Param2": 35,
+            "Param3": 20
+          }
+        },
+        {
+          "level": 9,
+          "mana": 20,
+          "cooldown": 12,
+          "params": {
+            "Param1": 22,
+            "Param2": 55,
+            "Param3": 21
+          }
+        },
+        {
+          "level": 12,
+          "mana": 25,
+          "cooldown": 12,
+          "params": {
+            "Param1": 24,
+            "Param2": 110,
+            "Param3": 21
+          }
+        },
+        {
+          "level": 15,
+          "mana": 30,
+          "cooldown": 12,
+          "params": {
+            "Param1": 26,
+            "Param2": 220,
+            "Param3": 22
+          }
+        },
+        {
+          "level": 18,
+          "mana": 35,
+          "cooldown": 12,
+          "params": {
+            "Param1": 29,
+            "Param2": 310,
+            "Param3": 23
+          }
+        },
+        {
+          "level": 21,
+          "mana": 40,
+          "cooldown": 12,
+          "params": {
+            "Param1": 31,
+            "Param2": 415,
+            "Param3": 24
+          }
+        },
+        {
+          "level": 24,
+          "mana": 45,
+          "cooldown": 12,
+          "params": {
+            "Param1": 33,
+            "Param2": 535,
+            "Param3": 24
+          }
+        },
+        {
+          "level": 26,
+          "mana": 50,
+          "cooldown": 12,
+          "params": {
+            "Param1": 35,
+            "Param2": 760,
+            "Param3": 25
+          }
+        },
+        {
+          "level": 28,
+          "mana": 55,
+          "cooldown": 12,
+          "params": {
+            "Param1": 37,
+            "Param2": 935,
+            "Param3": 26
+          }
+        },
+        {
+          "level": 30,
+          "mana": 60,
+          "cooldown": 12,
+          "params": {
+            "Param1": 39,
+            "Param2": 1060,
+            "Param3": 26
+          }
+        },
+        {
+          "level": 32,
+          "mana": 65,
+          "cooldown": 12,
+          "params": {
+            "Param1": 41,
+            "Param2": 1195,
+            "Param3": 27
+          }
+        },
+        {
+          "level": 34,
+          "mana": 70,
+          "cooldown": 12,
+          "params": {
+            "Param1": 44,
+            "Param2": 1340,
+            "Param3": 28
+          }
+        },
+        {
+          "level": 36,
+          "mana": 75,
+          "cooldown": 12,
+          "params": {
+            "Param1": 46,
+            "Param2": 1495,
+            "Param3": 29
+          }
+        },
+        {
+          "level": 38,
+          "mana": 80,
+          "cooldown": 12,
+          "params": {
+            "Param1": 48,
+            "Param2": 1665,
+            "Param3": 29
+          }
+        },
+        {
+          "level": 40,
+          "mana": 85,
+          "cooldown": 12,
+          "params": {
+            "Param1": 50,
+            "Param2": 1835,
+            "Param3": 30
+          }
+        }
+      ],
+      "trainer": [
+        {
+          "max_level": 10,
+          "gold": 1500,
+          "required_level": 17,
+          "description": "You will be able to study Holy Smite in more detail.",
+          "available": true
+        },
+        {
+          "max_level": 13,
+          "gold": 5000,
+          "required_level": 27,
+          "description": "You will be able to take Holy Smite to new extremes.",
+          "available": true
+        },
+        {
+          "max_level": 15,
+          "gold": 10000,
+          "required_level": 32,
+          "description": "You will be able to become a master of Holy Smite.",
+          "available": true
+        }
+      ],
+      "own_effects": [
+        {
+          "_about": "on the target, Div2Fix OwnHitFx101",
+          "name": "HolySmite_Hit",
+          "builder": "smite_hit",
+          "rows_from": "FireBall_Cast"
+        },
+        {
+          "_about": "on the caster, Div2Fix OwnFx101",
+          "name": "HolySmite_Cast",
+          "builder": "smite_cast",
+          "rows_from": "FireBall_Cast"
+        }
+      ],
+      "own_animations": [
+        {
+          "_about": "made from code by tools/anim_holysmite.py; a sequence in the 14 player KFMs",
+          "sequence": "Skill_HolySmite",
+          "builder": "holy_smite"
+        }
+      ]
+    },
+    {
+      "id": "Blessing",
+      "stage": "own skill: id 0x66, Div2Fix Name102, OwnBless102; Param1 % health per second, Param2 mana per second, Param3 seconds",
+      "uuid": "Blessing",
+      "name": "Blessing",
+      "code_path": "Newt",
+      "tree": [
+        8,
+        3
+      ],
+      "default_level": 0,
+      "icon": {
+        "from": "MagicMissile",
+        "art": "blessing",
+        "saturation": 0.75,
+        "green": 1.1
+      },
+      "description": "For [3] seconds you recover [1]% of your health and [2] mana every second.",
+      "lyrical": "Not every prayer is answered, but this one is.",
+      "ru": {
+        "name": "Благословение - активный навык",
+        "description": "[3] с вы восстанавливаете [1]% здоровья и [2] маны в секунду.",
+        "lyrical": "Не на всякую молитву приходит ответ, но на эту приходит."
+      },
+      "ranks": [
+        {
+          "level": 6,
+          "mana": 20,
+          "cooldown": 45,
+          "params": {
+            "Param1": 1.0,
+            "Param2": 2,
+            "Param3": 10
+          }
+        },
+        {
+          "level": 9,
+          "mana": 24,
+          "cooldown": 45,
+          "params": {
+            "Param1": 1.2,
+            "Param2": 3,
+            "Param3": 11
+          }
+        },
+        {
+          "level": 12,
+          "mana": 27,
+          "cooldown": 45,
+          "params": {
+            "Param1": 1.4,
+            "Param2": 5,
+            "Param3": 11
+          }
+        },
+        {
+          "level": 15,
+          "mana": 31,
+          "cooldown": 45,
+          "params": {
+            "Param1": 1.6,
+            "Param2": 6,
+            "Param3": 12
+          }
+        },
+        {
+          "level": 18,
+          "mana": 34,
+          "cooldown": 45,
+          "params": {
+            "Param1": 2,
+            "Param2": 7,
+            "Param3": 12
+          }
+        },
+        {
+          "level": 21,
+          "mana": 38,
+          "cooldown": 45,
+          "params": {
+            "Param1": 2.1,
+            "Param2": 8,
+            "Param3": 13
+          }
+        },
+        {
+          "level": 24,
+          "mana": 41,
+          "cooldown": 45,
+          "params": {
+            "Param1": 2.3,
+            "Param2": 10,
+            "Param3": 13
+          }
+        },
+        {
+          "level": 26,
+          "mana": 45,
+          "cooldown": 45,
+          "params": {
+            "Param1": 2.5,
+            "Param2": 11,
+            "Param3": 14
+          }
+        },
+        {
+          "level": 28,
+          "mana": 49,
+          "cooldown": 45,
+          "params": {
+            "Param1": 2.7,
+            "Param2": 12,
+            "Param3": 15
+          }
+        },
+        {
+          "level": 30,
+          "mana": 52,
+          "cooldown": 45,
+          "params": {
+            "Param1": 2.9,
+            "Param2": 14,
+            "Param3": 15
+          }
+        },
+        {
+          "level": 32,
+          "mana": 56,
+          "cooldown": 45,
+          "params": {
+            "Param1": 3.1,
+            "Param2": 15,
+            "Param3": 16
+          }
+        },
+        {
+          "level": 34,
+          "mana": 59,
+          "cooldown": 45,
+          "params": {
+            "Param1": 3.4,
+            "Param2": 16,
+            "Param3": 16
+          }
+        },
+        {
+          "level": 36,
+          "mana": 63,
+          "cooldown": 45,
+          "params": {
+            "Param1": 3.6,
+            "Param2": 17,
+            "Param3": 17
+          }
+        },
+        {
+          "level": 38,
+          "mana": 66,
+          "cooldown": 45,
+          "params": {
+            "Param1": 3.8,
+            "Param2": 19,
+            "Param3": 17
+          }
+        },
+        {
+          "level": 40,
+          "mana": 70,
+          "cooldown": 45,
+          "params": {
+            "Param1": 4.0,
+            "Param2": 20,
+            "Param3": 18
+          }
+        }
+      ],
+      "trainer": [
+        {
+          "max_level": 10,
+          "gold": 1500,
+          "required_level": 17,
+          "description": "You will be able to study Blessing in more detail.",
+          "available": true
+        },
+        {
+          "max_level": 13,
+          "gold": 5000,
+          "required_level": 27,
+          "description": "You will be able to take Blessing to new extremes.",
+          "available": true
+        },
+        {
+          "max_level": 15,
+          "gold": 10000,
+          "required_level": 32,
+          "description": "You will be able to become a master of Blessing.",
+          "available": true
+        }
+      ]
+    },
+    {
+      "id": "BowExpertise",
+      "stage": "own passive: id 0x67, Div2Fix Name103, BowSkill=103; Param1 % faster, five ranks 0, 10, 25, 40, 50 (copies of the shots, build_mage BOW_TIERS); the game's unused WeaponExpertiseBow icon",
+      "uuid": "Bow Expertise",
+      "name": "Bow Expertise",
+      "code_path": "Death Blow",
+      "tree": [
+        5,
+        9
+      ],
+      "default_level": 1,
+      "icon": {
+        "from": "MagicMissile",
+        "art": "weapon_expertise_bow",
+        "saturation": 0.75,
+        "green": 1.1
+      },
+      "description": "You shoot [1]% faster with a bow.",
+      "lyrical": "The hand learns what the eye has long known.",
+      "ru": {
+        "name": "Владение луком - пассивный навык",
+        "description": "Вы стреляете из лука на [1]% быстрее.",
+        "lyrical": "Рука учится тому, что глаз давно знает."
+      },
+      "ranks": [
+        {
+          "level": 1,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 0
+          }
+        },
+        {
+          "level": 8,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 10
+          }
+        },
+        {
+          "level": 16,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 25
+          }
+        },
+        {
+          "level": 24,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 40
+          }
+        },
+        {
+          "level": 32,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 50
+          }
+        }
+      ],
+      "trainer": []
+    },
+    {
+      "id": "Drain",
+      "stage": "own skill: id 0x68, Div2Fix Name104, OwnDrain104; Param1 damage per second, Param2 seconds, Param3 % healed, Param4 metres",
+      "uuid": "Drain",
+      "name": "Drain",
+      "code_path": "Newt",
+      "tree": [
+        8,
+        0
+      ],
+      "default_level": 0,
+      "icon": {
+        "from": "MagicMissile",
+        "art": "drain",
+        "saturation": 0.75,
+        "green": 1.1
+      },
+      "description": "The enemy you target, up to [4] meters away, loses [1] points to magic damage every second for [2] seconds; [3]% of it heals you.",
+      "lyrical": "What it loses, you keep.",
+      "ru": {
+        "name": "Истощение - активный навык",
+        "description": "Выбранный враг на расстоянии до [4] м теряет [1] от магического урона в секунду в течение [2] с; [3]% урона лечит вас.",
+        "lyrical": "То, что теряет он, остаётся у вас."
+      },
+      "ranks": [
+        {
+          "level": 6,
+          "mana": 15,
+          "cooldown": 18,
+          "params": {
+            "Param1": 10,
+            "Param2": 6,
+            "Param3": 25,
+            "Param4": 20
+          }
+        },
+        {
+          "level": 9,
+          "mana": 20,
+          "cooldown": 18,
+          "params": {
+            "Param1": 16,
+            "Param2": 6,
+            "Param3": 27,
+            "Param4": 21
+          }
+        },
+        {
+          "level": 12,
+          "mana": 24,
+          "cooldown": 18,
+          "params": {
+            "Param1": 33,
+            "Param2": 7,
+            "Param3": 29,
+            "Param4": 21
+          }
+        },
+        {
+          "level": 15,
+          "mana": 29,
+          "cooldown": 18,
+          "params": {
+            "Param1": 66,
+            "Param2": 7,
+            "Param3": 30,
+            "Param4": 22
+          }
+        },
+        {
+          "level": 18,
+          "mana": 34,
+          "cooldown": 18,
+          "params": {
+            "Param1": 93,
+            "Param2": 7,
+            "Param3": 32,
+            "Param4": 23
+          }
+        },
+        {
+          "level": 21,
+          "mana": 38,
+          "cooldown": 18,
+          "params": {
+            "Param1": 124,
+            "Param2": 7,
+            "Param3": 34,
+            "Param4": 24
+          }
+        },
+        {
+          "level": 24,
+          "mana": 43,
+          "cooldown": 18,
+          "params": {
+            "Param1": 160,
+            "Param2": 8,
+            "Param3": 36,
+            "Param4": 24
+          }
+        },
+        {
+          "level": 26,
+          "mana": 48,
+          "cooldown": 18,
+          "params": {
+            "Param1": 228,
+            "Param2": 8,
+            "Param3": 38,
+            "Param4": 25
+          }
+        },
+        {
+          "level": 28,
+          "mana": 52,
+          "cooldown": 18,
+          "params": {
+            "Param1": 280,
+            "Param2": 8,
+            "Param3": 39,
+            "Param4": 26
+          }
+        },
+        {
+          "level": 30,
+          "mana": 57,
+          "cooldown": 18,
+          "params": {
+            "Param1": 318,
+            "Param2": 9,
+            "Param3": 41,
+            "Param4": 26
+          }
+        },
+        {
+          "level": 32,
+          "mana": 61,
+          "cooldown": 18,
+          "params": {
+            "Param1": 358,
+            "Param2": 9,
+            "Param3": 43,
+            "Param4": 27
+          }
+        },
+        {
+          "level": 34,
+          "mana": 66,
+          "cooldown": 18,
+          "params": {
+            "Param1": 402,
+            "Param2": 9,
+            "Param3": 45,
+            "Param4": 28
+          }
+        },
+        {
+          "level": 36,
+          "mana": 71,
+          "cooldown": 18,
+          "params": {
+            "Param1": 448,
+            "Param2": 9,
+            "Param3": 46,
+            "Param4": 29
+          }
+        },
+        {
+          "level": 38,
+          "mana": 75,
+          "cooldown": 18,
+          "params": {
+            "Param1": 500,
+            "Param2": 10,
+            "Param3": 48,
+            "Param4": 29
+          }
+        },
+        {
+          "level": 40,
+          "mana": 80,
+          "cooldown": 18,
+          "params": {
+            "Param1": 550,
+            "Param2": 10,
+            "Param3": 50,
+            "Param4": 30
+          }
+        }
+      ],
+      "trainer": [
+        {
+          "max_level": 10,
+          "gold": 1500,
+          "required_level": 17,
+          "description": "You will be able to study Drain in more detail.",
+          "available": true
+        },
+        {
+          "max_level": 13,
+          "gold": 5000,
+          "required_level": 27,
+          "description": "You will be able to take Drain to new extremes.",
+          "available": true
+        },
+        {
+          "max_level": 15,
+          "gold": 10000,
+          "required_level": 32,
+          "description": "You will be able to become a master of Drain.",
+          "available": true
+        }
+      ],
+      "own_effects": [
+        {
+          "_about": "on the target at every tick, Div2Fix OwnHitFx104",
+          "name": "Drain_Hit",
+          "builder": "drain_hit",
+          "rows_from": "FireBall_Cast"
+        },
+        {
+          "_about": "on the caster, Div2Fix OwnFx104",
+          "name": "Drain_Cast",
+          "builder": "drain_cast",
+          "rows_from": "FireBall_Cast"
+        }
+      ]
+    },
+    {
+      "id": "IceArrow",
+      "stage": "own skill: id 0x69 on the game's Poison Arrows code (Param1, Param2 = its poison, 0); Div2Fix Name105, IceArrowSkill=105, Slow105",
+      "uuid": "Ice Arrow",
+      "name": "Ice Arrow",
+      "code_path": "Poison Arrows",
+      "tree": [
+        6,
+        6
+      ],
+      "default_level": 0,
+      "icon": {
+        "from": "MagicMissile",
+        "art": "ice_arrow",
+        "saturation": 0.75,
+        "green": 1.1
+      },
+      "description": "You fire an arrow of ice that deals [3] points of magic damage, whatever your bow, and slows the enemy down by 30% for 2 seconds (+5% and +0.25 s per rank above the first, up to 80% and 5.5 s at rank 15).",
+      "lyrical": "Cold does not need to kill. It only needs to wait.",
+      "ru": {
+        "name": "Ледяная стрела - активный навык",
+        "description": "Вы выпускаете ледяную стрелу, которая наносит [3] ед. магического урона независимо от лука и замедляет врага на 30% на 2 с (+5% и +0,25 с за каждый ранг выше первого, до 80% и 5,5 с на 15 ранге).",
+        "lyrical": "Холоду не нужно убивать. Ему достаточно подождать."
+      },
+      "ranks": [
+        {
+          "level": 6,
+          "mana": 6,
+          "cooldown": 6,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 26
+          }
+        },
+        {
+          "level": 9,
+          "mana": 8,
+          "cooldown": 6,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 41
+          }
+        },
+        {
+          "level": 12,
+          "mana": 10,
+          "cooldown": 6,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 82
+          }
+        },
+        {
+          "level": 15,
+          "mana": 12,
+          "cooldown": 6,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 165
+          }
+        },
+        {
+          "level": 18,
+          "mana": 14,
+          "cooldown": 6,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 232
+          }
+        },
+        {
+          "level": 21,
+          "mana": 16,
+          "cooldown": 6,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 311
+          }
+        },
+        {
+          "level": 24,
+          "mana": 18,
+          "cooldown": 6,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 401
+          }
+        },
+        {
+          "level": 26,
+          "mana": 20,
+          "cooldown": 6,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 570
+          }
+        },
+        {
+          "level": 28,
+          "mana": 23,
+          "cooldown": 6,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 701
+          }
+        },
+        {
+          "level": 30,
+          "mana": 25,
+          "cooldown": 6,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 795
+          }
+        },
+        {
+          "level": 32,
+          "mana": 27,
+          "cooldown": 6,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 896
+          }
+        },
+        {
+          "level": 34,
+          "mana": 29,
+          "cooldown": 6,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 1005
+          }
+        },
+        {
+          "level": 36,
+          "mana": 31,
+          "cooldown": 6,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 1121
+          }
+        },
+        {
+          "level": 38,
+          "mana": 33,
+          "cooldown": 6,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 1249
+          }
+        },
+        {
+          "level": 40,
+          "mana": 35,
+          "cooldown": 6,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 1376
+          }
+        }
+      ],
+      "trainer": [
+        {
+          "max_level": 10,
+          "gold": 1500,
+          "required_level": 17,
+          "description": "You will be able to study Ice Arrow in more detail.",
+          "available": true
+        },
+        {
+          "max_level": 13,
+          "gold": 5000,
+          "required_level": 27,
+          "description": "You will be able to take Ice Arrow to new extremes.",
+          "available": true
+        },
+        {
+          "max_level": 15,
+          "gold": 10000,
+          "required_level": 32,
+          "description": "You will be able to become a master of Ice Arrow.",
+          "available": true
+        }
+      ]
+    },
+    {
+      "id": "AimedShot",
+      "stage": "own passive: id 0x6A, Div2Fix Name106, AimSkill=106; Param1 max %, Param2 from metres, Param3 full at metres",
+      "uuid": "Aimed Shot",
+      "name": "Aimed Shot",
+      "code_path": "Death Blow",
+      "tree": [
+        5,
+        7
+      ],
+      "default_level": 0,
+      "icon": {
+        "from": "MagicMissile",
+        "art": "aimed_shot",
+        "saturation": 0.75,
+        "green": 1.1
+      },
+      "description": "Your arrows' critical hits deal up to [1]% more damage to distant targets: nothing up to [2] metres, the full bonus from [3] metres.",
+      "lyrical": "The further the target, the longer the arrow has to think.",
+      "ru": {
+        "name": "Прицельный выстрел - пассивный навык",
+        "description": "Критические удары ваших стрел наносят дальним целям до [1]% больше урона: до [2] м бонуса нет, полный бонус от [3] м.",
+        "lyrical": "Чем дальше цель, тем дольше стреле думать."
+      },
+      "ranks": [
+        {
+          "level": 6,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 10,
+            "Param2": 5,
+            "Param3": 20
+          }
+        },
+        {
+          "level": 9,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 13,
+            "Param2": 5,
+            "Param3": 20
+          }
+        },
+        {
+          "level": 12,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 16,
+            "Param2": 5,
+            "Param3": 20
+          }
+        },
+        {
+          "level": 15,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 19,
+            "Param2": 5,
+            "Param3": 20
+          }
+        },
+        {
+          "level": 18,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 21,
+            "Param2": 5,
+            "Param3": 20
+          }
+        },
+        {
+          "level": 21,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 24,
+            "Param2": 5,
+            "Param3": 20
+          }
+        },
+        {
+          "level": 24,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 27,
+            "Param2": 5,
+            "Param3": 20
+          }
+        },
+        {
+          "level": 26,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 30,
+            "Param2": 5,
+            "Param3": 20
+          }
+        },
+        {
+          "level": 28,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 33,
+            "Param2": 5,
+            "Param3": 20
+          }
+        },
+        {
+          "level": 30,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 36,
+            "Param2": 5,
+            "Param3": 20
+          }
+        },
+        {
+          "level": 32,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 39,
+            "Param2": 5,
+            "Param3": 20
+          }
+        },
+        {
+          "level": 34,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 41,
+            "Param2": 5,
+            "Param3": 20
+          }
+        },
+        {
+          "level": 36,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 44,
+            "Param2": 5,
+            "Param3": 20
+          }
+        },
+        {
+          "level": 38,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 47,
+            "Param2": 5,
+            "Param3": 20
+          }
+        },
+        {
+          "level": 40,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 50,
+            "Param2": 5,
+            "Param3": 20
+          }
+        }
+      ],
+      "trainer": [
+        {
+          "max_level": 10,
+          "gold": 1500,
+          "required_level": 17,
+          "description": "You will be able to study Aimed Shot in more detail.",
+          "available": true
+        },
+        {
+          "max_level": 13,
+          "gold": 5000,
+          "required_level": 27,
+          "description": "You will be able to take Aimed Shot to new extremes.",
+          "available": true
+        },
+        {
+          "max_level": 15,
+          "gold": 10000,
+          "required_level": 32,
+          "description": "You will be able to become a master of Aimed Shot.",
+          "available": true
+        }
+      ]
+    },
+    {
+      "id": "ArrowVolley",
+      "stage": "own skill: id 0x6B on the game's Poison Arrows code; Div2Fix Name107, VolleySkill=107; Param1, Param2 = 0; Param3 arrows, Param4 % of the bow's damage each",
+      "uuid": "Arrow Volley",
+      "name": "Arrow Volley",
+      "code_path": "Poison Arrows",
+      "tree": [
+        6,
+        7
+      ],
+      "default_level": 0,
+      "icon": {
+        "from": "MagicMissile",
+        "art": "arrow_volley",
+        "saturation": 0.75,
+        "green": 1.1
+      },
+      "description": "You loose [3] arrows at your target in quick succession, each dealing [4]% of your bow's damage.",
+      "lyrical": "One arrow is a question. Six are an answer.",
+      "ru": {
+        "name": "Залп стрел - активный навык",
+        "description": "Вы быстро выпускаете в цель стрелы ([3] шт.), каждая наносит [4]% урона лука.",
+        "lyrical": "Одна стрела - это вопрос. Шесть - уже ответ."
+      },
+      "ranks": [
+        {
+          "level": 6,
+          "mana": 6,
+          "cooldown": 10,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 4,
+            "Param4": 50
+          }
+        },
+        {
+          "level": 9,
+          "mana": 8,
+          "cooldown": 10,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 4,
+            "Param4": 52
+          }
+        },
+        {
+          "level": 12,
+          "mana": 10,
+          "cooldown": 10,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 4,
+            "Param4": 54
+          }
+        },
+        {
+          "level": 15,
+          "mana": 12,
+          "cooldown": 10,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 4,
+            "Param4": 56
+          }
+        },
+        {
+          "level": 18,
+          "mana": 14,
+          "cooldown": 10,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 4,
+            "Param4": 59
+          }
+        },
+        {
+          "level": 21,
+          "mana": 16,
+          "cooldown": 10,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 5,
+            "Param4": 61
+          }
+        },
+        {
+          "level": 24,
+          "mana": 18,
+          "cooldown": 10,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 5,
+            "Param4": 63
+          }
+        },
+        {
+          "level": 26,
+          "mana": 20,
+          "cooldown": 10,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 5,
+            "Param4": 65
+          }
+        },
+        {
+          "level": 28,
+          "mana": 23,
+          "cooldown": 10,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 5,
+            "Param4": 67
+          }
+        },
+        {
+          "level": 30,
+          "mana": 25,
+          "cooldown": 10,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 5,
+            "Param4": 69
+          }
+        },
+        {
+          "level": 32,
+          "mana": 27,
+          "cooldown": 10,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 6,
+            "Param4": 71
+          }
+        },
+        {
+          "level": 34,
+          "mana": 29,
+          "cooldown": 10,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 6,
+            "Param4": 74
+          }
+        },
+        {
+          "level": 36,
+          "mana": 31,
+          "cooldown": 10,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 6,
+            "Param4": 76
+          }
+        },
+        {
+          "level": 38,
+          "mana": 33,
+          "cooldown": 10,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 6,
+            "Param4": 78
+          }
+        },
+        {
+          "level": 40,
+          "mana": 35,
+          "cooldown": 10,
+          "params": {
+            "Param1": 0,
+            "Param2": 0,
+            "Param3": 6,
+            "Param4": 80
+          }
+        }
+      ],
+      "trainer": [
+        {
+          "max_level": 10,
+          "gold": 1500,
+          "required_level": 17,
+          "description": "You will be able to study Arrow Volley in more detail.",
+          "available": true
+        },
+        {
+          "max_level": 13,
+          "gold": 5000,
+          "required_level": 27,
+          "description": "You will be able to take Arrow Volley to new extremes.",
+          "available": true
+        },
+        {
+          "max_level": 15,
+          "gold": 10000,
+          "required_level": 32,
+          "description": "You will be able to become a master of Arrow Volley.",
+          "available": true
+        }
+      ]
+    },
+    {
+      "id": "ArmorBreaker",
+      "stage": "own passive: id 0x6C, Div2Fix Name108, BreakSkill=108, BreakFx; Param1 chance %, Param2 % more damage, Param3 seconds",
+      "uuid": "Armor Breaker",
+      "name": "Armor Breaker",
+      "code_path": "Death Blow",
+      "tree": [
+        6,
+        5
+      ],
+      "default_level": 0,
+      "icon": {
+        "from": "MagicMissile",
+        "art": "armor_breaker",
+        "saturation": 0.75,
+        "green": 1.1
+      },
+      "own_effects": [
+        {
+          "_about": "on the cracked enemy, Div2Fix BreakFx",
+          "name": "ArmorBreaker_Crack",
+          "builder": "armor_crack",
+          "rows_from": "FireBall_Cast"
+        }
+      ],
+      "description": "Your melee hits have a [1]% chance to crack the enemy's armour: for [3] seconds it takes [2]% more damage from every hit.",
+      "lyrical": "Every wall has its first crack.",
+      "ru": {
+        "name": "Пробивание брони - пассивный навык",
+        "description": "Ваши удары ближнего боя с шансом [1]% раскалывают броню врага: [3] с он получает на [2]% больше урона от каждого удара.",
+        "lyrical": "У каждой стены есть первая трещина."
+      },
+      "ranks": [
+        {
+          "level": 6,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 10,
+            "Param2": 10,
+            "Param3": 5
+          }
+        },
+        {
+          "level": 9,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 11,
+            "Param2": 11,
+            "Param3": 5
+          }
+        },
+        {
+          "level": 12,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 13,
+            "Param2": 13,
+            "Param3": 5
+          }
+        },
+        {
+          "level": 15,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 14,
+            "Param2": 14,
+            "Param3": 5
+          }
+        },
+        {
+          "level": 18,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 16,
+            "Param2": 16,
+            "Param3": 5
+          }
+        },
+        {
+          "level": 21,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 17,
+            "Param2": 17,
+            "Param3": 5
+          }
+        },
+        {
+          "level": 24,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 19,
+            "Param2": 19,
+            "Param3": 5
+          }
+        },
+        {
+          "level": 26,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 20,
+            "Param2": 20,
+            "Param3": 5
+          }
+        },
+        {
+          "level": 28,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 21,
+            "Param2": 21,
+            "Param3": 5
+          }
+        },
+        {
+          "level": 30,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 23,
+            "Param2": 23,
+            "Param3": 5
+          }
+        },
+        {
+          "level": 32,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 24,
+            "Param2": 24,
+            "Param3": 5
+          }
+        },
+        {
+          "level": 34,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 26,
+            "Param2": 26,
+            "Param3": 5
+          }
+        },
+        {
+          "level": 36,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 27,
+            "Param2": 27,
+            "Param3": 5
+          }
+        },
+        {
+          "level": 38,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 29,
+            "Param2": 29,
+            "Param3": 5
+          }
+        },
+        {
+          "level": 40,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 30,
+            "Param2": 30,
+            "Param3": 5
+          }
+        }
+      ],
+      "trainer": [
+        {
+          "max_level": 10,
+          "gold": 1500,
+          "required_level": 17,
+          "description": "You will be able to study Armor Breaker in more detail.",
+          "available": true
+        },
+        {
+          "max_level": 13,
+          "gold": 5000,
+          "required_level": 27,
+          "description": "You will be able to take Armor Breaker to new extremes.",
+          "available": true
+        },
+        {
+          "max_level": 15,
+          "gold": 10000,
+          "required_level": 32,
+          "description": "You will be able to become a master of Armor Breaker.",
+          "available": true
+        }
+      ]
+    },
+    {
+      "id": "BattleCry",
+      "stage": "own skill: id 0x6D, Div2Fix Name109, OwnCry109; Param1 % less from enemies, Param2 % more, Param3 metres, Param4 seconds",
+      "uuid": "Battle Cry",
+      "name": "Battle Cry",
+      "code_path": "Newt",
+      "tree": [
+        7,
+        4
+      ],
+      "default_level": 0,
+      "icon": {
+        "from": "MagicMissile",
+        "art": "battle_cry",
+        "saturation": 0.75,
+        "green": 1.1
+      },
+      "own_effects": [
+        {
+          "_about": "on the hero, Div2Fix OwnFx109",
+          "name": "BattleCry_Wave",
+          "builder": "cry_wave",
+          "rows_from": "FireBall_Cast"
+        }
+      ],
+      "description": "Your shout weakens enemies within [3] metres: for [4] seconds they deal [1]% less damage, while you and your summoned creatures deal [2]% more.",
+      "lyrical": "Courage is loud. So is fear.",
+      "ru": {
+        "name": "Боевой клич - активный навык",
+        "description": "Ваш крик ослабляет врагов в радиусе [3] м: [4] с они наносят на [1]% меньше урона, а вы и призванные существа - на [2]% больше.",
+        "lyrical": "Храбрость звучит громко. Страх - тоже."
+      },
+      "ranks": [
+        {
+          "level": 6,
+          "mana": 10,
+          "cooldown": 30,
+          "params": {
+            "Param1": 10,
+            "Param2": 10,
+            "Param3": 8,
+            "Param4": 6
+          }
+        },
+        {
+          "level": 9,
+          "mana": 13,
+          "cooldown": 29,
+          "params": {
+            "Param1": 11,
+            "Param2": 11,
+            "Param3": 8,
+            "Param4": 6
+          }
+        },
+        {
+          "level": 12,
+          "mana": 16,
+          "cooldown": 28,
+          "params": {
+            "Param1": 13,
+            "Param2": 13,
+            "Param3": 8,
+            "Param4": 7
+          }
+        },
+        {
+          "level": 15,
+          "mana": 19,
+          "cooldown": 27,
+          "params": {
+            "Param1": 14,
+            "Param2": 14,
+            "Param3": 8,
+            "Param4": 7
+          }
+        },
+        {
+          "level": 18,
+          "mana": 21,
+          "cooldown": 27,
+          "params": {
+            "Param1": 16,
+            "Param2": 16,
+            "Param3": 8,
+            "Param4": 8
+          }
+        },
+        {
+          "level": 21,
+          "mana": 24,
+          "cooldown": 26,
+          "params": {
+            "Param1": 17,
+            "Param2": 17,
+            "Param3": 8,
+            "Param4": 8
+          }
+        },
+        {
+          "level": 24,
+          "mana": 27,
+          "cooldown": 25,
+          "params": {
+            "Param1": 19,
+            "Param2": 19,
+            "Param3": 8,
+            "Param4": 9
+          }
+        },
+        {
+          "level": 26,
+          "mana": 30,
+          "cooldown": 24,
+          "params": {
+            "Param1": 20,
+            "Param2": 20,
+            "Param3": 8,
+            "Param4": 9
+          }
+        },
+        {
+          "level": 28,
+          "mana": 33,
+          "cooldown": 23,
+          "params": {
+            "Param1": 21,
+            "Param2": 21,
+            "Param3": 8,
+            "Param4": 9
+          }
+        },
+        {
+          "level": 30,
+          "mana": 36,
+          "cooldown": 22,
+          "params": {
+            "Param1": 23,
+            "Param2": 23,
+            "Param3": 8,
+            "Param4": 10
+          }
+        },
+        {
+          "level": 32,
+          "mana": 39,
+          "cooldown": 21,
+          "params": {
+            "Param1": 24,
+            "Param2": 24,
+            "Param3": 8,
+            "Param4": 10
+          }
+        },
+        {
+          "level": 34,
+          "mana": 41,
+          "cooldown": 21,
+          "params": {
+            "Param1": 26,
+            "Param2": 26,
+            "Param3": 8,
+            "Param4": 11
+          }
+        },
+        {
+          "level": 36,
+          "mana": 44,
+          "cooldown": 20,
+          "params": {
+            "Param1": 27,
+            "Param2": 27,
+            "Param3": 8,
+            "Param4": 11
+          }
+        },
+        {
+          "level": 38,
+          "mana": 47,
+          "cooldown": 19,
+          "params": {
+            "Param1": 29,
+            "Param2": 29,
+            "Param3": 8,
+            "Param4": 12
+          }
+        },
+        {
+          "level": 40,
+          "mana": 50,
+          "cooldown": 18,
+          "params": {
+            "Param1": 30,
+            "Param2": 30,
+            "Param3": 8,
+            "Param4": 12
+          }
+        }
+      ],
+      "trainer": [
+        {
+          "max_level": 10,
+          "gold": 1500,
+          "required_level": 17,
+          "description": "You will be able to study Battle Cry in more detail.",
+          "available": true
+        },
+        {
+          "max_level": 13,
+          "gold": 5000,
+          "required_level": 27,
+          "description": "You will be able to take Battle Cry to new extremes.",
+          "available": true
+        },
+        {
+          "max_level": 15,
+          "gold": 10000,
+          "required_level": 32,
+          "description": "You will be able to become a master of Battle Cry.",
+          "available": true
+        }
+      ]
+    },
+    {
+      "id": "RamCharge",
+      "stage": "own: id 0x6E, Div2Fix Name110, RamSkill=110, OwnKnock110, OwnHitFx110; on Rush Attack code: Param1 times the damage, Param2 % stun (0: the fall instead), Param3 % of the hit around, Param4 metres, Param5 % fall",
+      "uuid": "Ram Charge",
+      "name": "Ram Charge",
+      "code_path": "Rush Attack",
+      "tree": [
+        7,
+        5
+      ],
+      "default_level": 0,
+      "icon": {
+        "from": "MagicMissile",
+        "art": "ram_charge",
+        "saturation": 0.75,
+        "green": 1.1
+      },
+      "description": "You charge your enemy and strike with [1] times your normal damage. Every other enemy within [4] metres takes [3]% of the blow, and each of them, the target too, is knocked down with a [5]% chance.",
+      "lyrical": "Some doors are opened with a key. Others with a shoulder.",
+      "ru": {
+        "name": "Таран - активный навык",
+        "description": "Вы бросаетесь на врага и наносите [1]-кратно усиленный удар. Остальные враги в радиусе [4] м получают [3]% этого удара, и каждый из них, как и сама цель, с вероятностью [5]% падает с ног.",
+        "lyrical": "Одни двери открывают ключом. Другие - плечом."
+      },
+      "ranks": [
+        {
+          "level": 6,
+          "mana": 12,
+          "cooldown": 12,
+          "params": {
+            "Param1": 1.5,
+            "Param2": 0,
+            "Param3": 50,
+            "Param4": 3,
+            "Param5": 50
+          }
+        },
+        {
+          "level": 9,
+          "mana": 15,
+          "cooldown": 12,
+          "params": {
+            "Param1": 1.6,
+            "Param2": 0,
+            "Param3": 53,
+            "Param4": 3,
+            "Param5": 54
+          }
+        },
+        {
+          "level": 12,
+          "mana": 18,
+          "cooldown": 12,
+          "params": {
+            "Param1": 1.7,
+            "Param2": 0,
+            "Param3": 56,
+            "Param4": 3,
+            "Param5": 57
+          }
+        },
+        {
+          "level": 15,
+          "mana": 21,
+          "cooldown": 11.5,
+          "params": {
+            "Param1": 1.8,
+            "Param2": 0,
+            "Param3": 59,
+            "Param4": 3,
+            "Param5": 61
+          }
+        },
+        {
+          "level": 18,
+          "mana": 24,
+          "cooldown": 11.5,
+          "params": {
+            "Param1": 1.9,
+            "Param2": 0,
+            "Param3": 62,
+            "Param4": 3,
+            "Param5": 64
+          }
+        },
+        {
+          "level": 21,
+          "mana": 27,
+          "cooldown": 11,
+          "params": {
+            "Param1": 2.0,
+            "Param2": 0,
+            "Param3": 65,
+            "Param4": 3,
+            "Param5": 68
+          }
+        },
+        {
+          "level": 24,
+          "mana": 31,
+          "cooldown": 11,
+          "params": {
+            "Param1": 2.1,
+            "Param2": 0,
+            "Param3": 68,
+            "Param4": 3,
+            "Param5": 71
+          }
+        },
+        {
+          "level": 26,
+          "mana": 34,
+          "cooldown": 10.5,
+          "params": {
+            "Param1": 2.2,
+            "Param2": 0,
+            "Param3": 71,
+            "Param4": 3,
+            "Param5": 75
+          }
+        },
+        {
+          "level": 28,
+          "mana": 37,
+          "cooldown": 10.5,
+          "params": {
+            "Param1": 2.3,
+            "Param2": 0,
+            "Param3": 74,
+            "Param4": 3,
+            "Param5": 79
+          }
+        },
+        {
+          "level": 30,
+          "mana": 40,
+          "cooldown": 10,
+          "params": {
+            "Param1": 2.4,
+            "Param2": 0,
+            "Param3": 77,
+            "Param4": 3,
+            "Param5": 82
+          }
+        },
+        {
+          "level": 32,
+          "mana": 44,
+          "cooldown": 10,
+          "params": {
+            "Param1": 2.5,
+            "Param2": 0,
+            "Param3": 80,
+            "Param4": 3,
+            "Param5": 86
+          }
+        },
+        {
+          "level": 34,
+          "mana": 47,
+          "cooldown": 9.5,
+          "params": {
+            "Param1": 2.6,
+            "Param2": 0,
+            "Param3": 83,
+            "Param4": 3,
+            "Param5": 89
+          }
+        },
+        {
+          "level": 36,
+          "mana": 51,
+          "cooldown": 9.5,
+          "params": {
+            "Param1": 2.7,
+            "Param2": 0,
+            "Param3": 86,
+            "Param4": 3,
+            "Param5": 93
+          }
+        },
+        {
+          "level": 38,
+          "mana": 54,
+          "cooldown": 9,
+          "params": {
+            "Param1": 2.8,
+            "Param2": 0,
+            "Param3": 88,
+            "Param4": 3,
+            "Param5": 96
+          }
+        },
+        {
+          "level": 40,
+          "mana": 58,
+          "cooldown": 9,
+          "params": {
+            "Param1": 3.0,
+            "Param2": 0,
+            "Param3": 90,
+            "Param4": 3,
+            "Param5": 100
+          }
+        }
+      ],
+      "trainer": [
+        {
+          "max_level": 10,
+          "gold": 1500,
+          "required_level": 17,
+          "description": "You will be able to study Ram Charge in more detail.",
+          "available": true
+        },
+        {
+          "max_level": 13,
+          "gold": 5000,
+          "required_level": 27,
+          "description": "You will be able to take Ram Charge to new extremes.",
+          "available": true
+        },
+        {
+          "max_level": 15,
+          "gold": 10000,
+          "required_level": 32,
+          "description": "You will be able to become a master of Ram Charge.",
+          "available": true
+        }
+      ]
+    },
+    {
+      "id": "ContagiousCurse",
+      "own_effects": [
+        {
+          "_about": "09.11: on the infected for as long as the curse lasts, Div2Fix CurseFx",
+          "name": "ContagiousCurse_Aura",
+          "builder": "curse_aura",
+          "rows_from": "FireBall_Cast"
+        }
+      ],
+      "stage": "own passive: id 0x6F, Div2Fix Name111, CurseSkill=111, OwnHitFx111; Param1 enemies, Param2 metres, Param3 % less damage, Param4 seconds; 3 generations",
+      "uuid": "Contagious Curse",
+      "name": "Contagious Curse",
+      "code_path": "Death Blow",
+      "tree": [
+        3,
+        1
+      ],
+      "default_level": 0,
+      "icon": {
+        "from": "MagicMissile",
+        "art": "contagious_curse",
+        "saturation": 0.75,
+        "green": 1.1
+      },
+      "description": "When an enemy cursed by you dies, the curse jumps to the [1] nearest enemies within [2] metres: for [4] seconds they deal [3]% less damage, and it can jump on from them.",
+      "lyrical": "A curse is never satisfied with one grave.",
+      "ru": {
+        "name": "Заразное проклятие - пассивный навык",
+        "description": "Когда проклятый вами враг умирает, проклятие перескакивает на [1] ближайших врагов в радиусе [2] м: [4] с они наносят на [3]% меньше урона, и от них оно может перейти дальше.",
+        "lyrical": "Проклятию всегда мало одной могилы."
+      },
+      "ranks": [
+        {
+          "level": 6,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 1,
+            "Param2": 6,
+            "Param3": 15,
+            "Param4": 6
+          }
+        },
+        {
+          "level": 9,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 1,
+            "Param2": 6,
+            "Param3": 16,
+            "Param4": 6
+          }
+        },
+        {
+          "level": 12,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 1,
+            "Param2": 7,
+            "Param3": 18,
+            "Param4": 7
+          }
+        },
+        {
+          "level": 15,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 1,
+            "Param2": 7,
+            "Param3": 19,
+            "Param4": 7
+          }
+        },
+        {
+          "level": 18,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 2,
+            "Param2": 7,
+            "Param3": 21,
+            "Param4": 8
+          }
+        },
+        {
+          "level": 21,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 2,
+            "Param2": 7,
+            "Param3": 22,
+            "Param4": 8
+          }
+        },
+        {
+          "level": 24,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 2,
+            "Param2": 8,
+            "Param3": 24,
+            "Param4": 9
+          }
+        },
+        {
+          "level": 26,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 2,
+            "Param2": 8,
+            "Param3": 25,
+            "Param4": 9
+          }
+        },
+        {
+          "level": 28,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 2,
+            "Param2": 8,
+            "Param3": 26,
+            "Param4": 9
+          }
+        },
+        {
+          "level": 30,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 2,
+            "Param2": 9,
+            "Param3": 28,
+            "Param4": 10
+          }
+        },
+        {
+          "level": 32,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 2,
+            "Param2": 9,
+            "Param3": 29,
+            "Param4": 10
+          }
+        },
+        {
+          "level": 34,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 3,
+            "Param2": 9,
+            "Param3": 31,
+            "Param4": 11
+          }
+        },
+        {
+          "level": 36,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 3,
+            "Param2": 9,
+            "Param3": 32,
+            "Param4": 11
+          }
+        },
+        {
+          "level": 38,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 3,
+            "Param2": 10,
+            "Param3": 34,
+            "Param4": 12
+          }
+        },
+        {
+          "level": 40,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 3,
+            "Param2": 10,
+            "Param3": 35,
+            "Param4": 12
+          }
+        }
+      ],
+      "trainer": [
+        {
+          "max_level": 10,
+          "gold": 1500,
+          "required_level": 17,
+          "description": "You will be able to study Contagious Curse in more detail.",
+          "available": true
+        },
+        {
+          "max_level": 13,
+          "gold": 5000,
+          "required_level": 27,
+          "description": "You will be able to take Contagious Curse to new extremes.",
+          "available": true
+        },
+        {
+          "max_level": 15,
+          "gold": 10000,
+          "required_level": 32,
+          "description": "You will be able to become a master of Contagious Curse.",
+          "available": true
+        }
+      ]
+    },
+    {
+      "id": "BloodBond",
+      "stage": "own passive: id 0x70, Div2Fix Name112, BondSkill=112; Param1 % of a hit on the hero, Param2 metres to the summon",
+      "uuid": "Blood Bond",
+      "name": "Blood Bond",
+      "code_path": "Death Blow",
+      "tree": [
+        8,
+        1
+      ],
+      "default_level": 0,
+      "icon": {
+        "from": "MagicMissile",
+        "art": "blood_bond",
+        "saturation": 0.75,
+        "green": 1.1
+      },
+      "description": "[1]% of the damage dealt to you is taken by your nearest summoned creature within [2] metres.",
+      "lyrical": "What you called is bound to you, in blood as in battle.",
+      "ru": {
+        "name": "Кровная связь - пассивный навык",
+        "description": "[1]% урона, который вы получаете, принимает на себя ближайшее призванное существо в радиусе [2] м.",
+        "lyrical": "То, что вы призвали, связано с вами - и кровью, и боем."
+      },
+      "ranks": [
+        {
+          "level": 6,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 10,
+            "Param2": 15
+          }
+        },
+        {
+          "level": 9,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 12,
+            "Param2": 15
+          }
+        },
+        {
+          "level": 12,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 14,
+            "Param2": 15
+          }
+        },
+        {
+          "level": 15,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 16,
+            "Param2": 15
+          }
+        },
+        {
+          "level": 18,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 19,
+            "Param2": 15
+          }
+        },
+        {
+          "level": 21,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 21,
+            "Param2": 15
+          }
+        },
+        {
+          "level": 24,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 23,
+            "Param2": 15
+          }
+        },
+        {
+          "level": 26,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 25,
+            "Param2": 15
+          }
+        },
+        {
+          "level": 28,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 27,
+            "Param2": 15
+          }
+        },
+        {
+          "level": 30,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 29,
+            "Param2": 15
+          }
+        },
+        {
+          "level": 32,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 31,
+            "Param2": 15
+          }
+        },
+        {
+          "level": 34,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 34,
+            "Param2": 15
+          }
+        },
+        {
+          "level": 36,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 36,
+            "Param2": 15
+          }
+        },
+        {
+          "level": 38,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 38,
+            "Param2": 15
+          }
+        },
+        {
+          "level": 40,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 40,
+            "Param2": 15
+          }
+        }
+      ],
+      "trainer": [
+        {
+          "max_level": 10,
+          "gold": 1500,
+          "required_level": 17,
+          "description": "You will be able to study Blood Bond in more detail.",
+          "available": true
+        },
+        {
+          "max_level": 13,
+          "gold": 5000,
+          "required_level": 27,
+          "description": "You will be able to take Blood Bond to new extremes.",
+          "available": true
+        },
+        {
+          "max_level": 15,
+          "gold": 10000,
+          "required_level": 32,
+          "description": "You will be able to become a master of Blood Bond.",
+          "available": true
+        }
+      ]
+    },
+    {
+      "id": "SummonExplosion",
+      "stage": "own skill: id 0x71, Div2Fix Name113, OwnBoom113, OwnBoomFx113, OwnHitFx113; Param2 magic damage, Param3 metres around the summon",
+      "uuid": "Summon Explosion",
+      "name": "Summon Explosion",
+      "code_path": "Newt",
+      "tree": [
+        7,
+        1
+      ],
+      "default_level": 0,
+      "icon": {
+        "from": "MagicMissile",
+        "art": "summon_explosion",
+        "saturation": 0.75,
+        "green": 1.1
+      },
+      "description": "All your summoned creatures explode one after another, each dealing [2] magic damage to every enemy within [3] metres of it. The creatures die.",
+      "lyrical": "Every servant has one last service.",
+      "ru": {
+        "name": "Взрыв призванного - активный навык",
+        "description": "Все ваши призванные существа взрываются одно за другим, и каждое наносит [2] магического урона всем врагам в радиусе [3] м от себя. Существа погибают.",
+        "lyrical": "У каждого слуги есть последняя служба."
+      },
+      "ranks": [
+        {
+          "level": 6,
+          "mana": 15,
+          "cooldown": 20,
+          "params": {
+            "Param1": 0,
+            "Param2": 36,
+            "Param3": 5
+          }
+        },
+        {
+          "level": 9,
+          "mana": 18,
+          "cooldown": 19,
+          "params": {
+            "Param1": 0,
+            "Param2": 60,
+            "Param3": 5
+          }
+        },
+        {
+          "level": 12,
+          "mana": 21,
+          "cooldown": 19,
+          "params": {
+            "Param1": 0,
+            "Param2": 120,
+            "Param3": 5
+          }
+        },
+        {
+          "level": 15,
+          "mana": 25,
+          "cooldown": 18,
+          "params": {
+            "Param1": 0,
+            "Param2": 240,
+            "Param3": 6
+          }
+        },
+        {
+          "level": 18,
+          "mana": 28,
+          "cooldown": 18,
+          "params": {
+            "Param1": 0,
+            "Param2": 336,
+            "Param3": 6
+          }
+        },
+        {
+          "level": 21,
+          "mana": 31,
+          "cooldown": 17,
+          "params": {
+            "Param1": 0,
+            "Param2": 450,
+            "Param3": 6
+          }
+        },
+        {
+          "level": 24,
+          "mana": 34,
+          "cooldown": 17,
+          "params": {
+            "Param1": 0,
+            "Param2": 582,
+            "Param3": 6
+          }
+        },
+        {
+          "level": 26,
+          "mana": 38,
+          "cooldown": 16,
+          "params": {
+            "Param1": 0,
+            "Param2": 828,
+            "Param3": 6
+          }
+        },
+        {
+          "level": 28,
+          "mana": 41,
+          "cooldown": 15,
+          "params": {
+            "Param1": 0,
+            "Param2": 1020,
+            "Param3": 7
+          }
+        },
+        {
+          "level": 30,
+          "mana": 44,
+          "cooldown": 15,
+          "params": {
+            "Param1": 0,
+            "Param2": 1158,
+            "Param3": 7
+          }
+        },
+        {
+          "level": 32,
+          "mana": 47,
+          "cooldown": 14,
+          "params": {
+            "Param1": 0,
+            "Param2": 1302,
+            "Param3": 7
+          }
+        },
+        {
+          "level": 34,
+          "mana": 50,
+          "cooldown": 14,
+          "params": {
+            "Param1": 0,
+            "Param2": 1464,
+            "Param3": 7
+          }
+        },
+        {
+          "level": 36,
+          "mana": 54,
+          "cooldown": 13,
+          "params": {
+            "Param1": 0,
+            "Param2": 1632,
+            "Param3": 8
+          }
+        },
+        {
+          "level": 38,
+          "mana": 57,
+          "cooldown": 13,
+          "params": {
+            "Param1": 0,
+            "Param2": 1818,
+            "Param3": 8
+          }
+        },
+        {
+          "level": 40,
+          "mana": 60,
+          "cooldown": 12,
+          "params": {
+            "Param1": 0,
+            "Param2": 2004,
+            "Param3": 8
+          }
+        }
+      ],
+      "trainer": [
+        {
+          "max_level": 10,
+          "gold": 1500,
+          "required_level": 17,
+          "description": "You will be able to study Summon Explosion in more detail.",
+          "available": true
+        },
+        {
+          "max_level": 13,
+          "gold": 5000,
+          "required_level": 27,
+          "description": "You will be able to take Summon Explosion to new extremes.",
+          "available": true
+        },
+        {
+          "max_level": 15,
+          "gold": 10000,
+          "required_level": 32,
+          "description": "You will be able to become a master of Summon Explosion.",
+          "available": true
+        }
+      ],
+      "own_effects": [
+        {
+          "_about": "07.11 on the exploding summon, Div2Fix OwnBoomFx113",
+          "name": "SummonExplosion_Boom",
+          "builder": "summon_boom",
+          "rows_from": "FireBall_Cast"
+        }
+      ]
+    },
+    {
+      "id": "CallOfVengeance",
+      "stage": "own passive: id 0x72, Div2Fix Name114, VengeSkill=114, OwnHitFx114; Param1 % more damage, Param2 seconds",
+      "uuid": "Call of Vengeance",
+      "name": "Call of Vengeance",
+      "code_path": "Death Blow",
+      "tree": [
+        6,
+        0
+      ],
+      "default_level": 0,
+      "icon": {
+        "from": "MagicMissile",
+        "art": "call_of_vengeance",
+        "saturation": 0.75,
+        "green": 1.1
+      },
+      "description": "When one of your summoned creatures dies, your attacks deal [1]% more damage for [2] seconds.",
+      "lyrical": "The fallen do not ask for tears. They ask for blood.",
+      "ru": {
+        "name": "Зов мести - пассивный навык",
+        "description": "Когда гибнет одно из ваших призванных существ, ваши атаки наносят на [1]% больше урона в течение [2] с.",
+        "lyrical": "Павшие не просят слёз. Они просят крови."
+      },
+      "ranks": [
+        {
+          "level": 6,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 20,
+            "Param2": 8
+          }
+        },
+        {
+          "level": 9,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 23,
+            "Param2": 8
+          }
+        },
+        {
+          "level": 12,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 26,
+            "Param2": 9
+          }
+        },
+        {
+          "level": 15,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 29,
+            "Param2": 10
+          }
+        },
+        {
+          "level": 18,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 31,
+            "Param2": 10
+          }
+        },
+        {
+          "level": 21,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 34,
+            "Param2": 10
+          }
+        },
+        {
+          "level": 24,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 37,
+            "Param2": 11
+          }
+        },
+        {
+          "level": 26,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 40,
+            "Param2": 12
+          }
+        },
+        {
+          "level": 28,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 43,
+            "Param2": 12
+          }
+        },
+        {
+          "level": 30,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 46,
+            "Param2": 12
+          }
+        },
+        {
+          "level": 32,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 49,
+            "Param2": 13
+          }
+        },
+        {
+          "level": 34,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 51,
+            "Param2": 14
+          }
+        },
+        {
+          "level": 36,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 54,
+            "Param2": 14
+          }
+        },
+        {
+          "level": 38,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 57,
+            "Param2": 14
+          }
+        },
+        {
+          "level": 40,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 60,
+            "Param2": 15
+          }
+        }
+      ],
+      "trainer": [
+        {
+          "max_level": 10,
+          "gold": 1500,
+          "required_level": 17,
+          "description": "You will be able to study Call of Vengeance in more detail.",
+          "available": true
+        },
+        {
+          "max_level": 13,
+          "gold": 5000,
+          "required_level": 27,
+          "description": "You will be able to take Call of Vengeance to new extremes.",
+          "available": true
+        },
+        {
+          "max_level": 15,
+          "gold": 10000,
+          "required_level": 32,
+          "description": "You will be able to become a master of Call of Vengeance.",
+          "available": true
+        }
+      ]
+    },
+    {
+      "id": "Detective",
+      "stage": "own passive: id 0x73, Div2Fix Name115, DetectSkill=115 (0x7578C0 made twice); Param1 % chance; 07.11 the user: 5 ranks, no trainers",
+      "uuid": "Detective",
+      "name": "Detective",
+      "code_path": "Death Blow",
+      "tree": [
+        4,
+        8
+      ],
+      "default_level": 0,
+      "icon": {
+        "from": "MagicMissile",
+        "art": "detective",
+        "saturation": 0.75,
+        "green": 1.1
+      },
+      "description": "You search more carefully: with a [1]% chance a defeated enemy or an opened chest gives a second set of loot.",
+      "lyrical": "The dead keep their secrets only from the careless.",
+      "ru": {
+        "name": "Сыщик - пассивный навык",
+        "description": "Вы обыскиваете тщательнее: с вероятностью [1]% побеждённый враг или открытый сундук даёт второй набор добычи.",
+        "lyrical": "Мёртвые хранят тайны только от невнимательных."
+      },
+      "ranks": [
+        {
+          "level": 6,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 10
+          }
+        },
+        {
+          "level": 14,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 20
+          }
+        },
+        {
+          "level": 22,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 30
+          }
+        },
+        {
+          "level": 30,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 40
+          }
+        },
+        {
+          "level": 38,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 50
+          }
+        }
+      ],
+      "trainer": []
+    },
+    {
+      "id": "Eloquence",
+      "stage": "own passive: id 0x74, Div2Fix Name116, TalkSkill=116 (wraps the item price 0x8D8470); Param1 % cheaper to buy, Param2 % dearer to sell; 5 ranks, no trainers",
+      "uuid": "Eloquence",
+      "name": "Eloquence",
+      "code_path": "Death Blow",
+      "tree": [
+        5,
+        8
+      ],
+      "default_level": 0,
+      "icon": {
+        "from": "MagicMissile",
+        "art": "eloquence",
+        "saturation": 0.75,
+        "green": 1.1
+      },
+      "description": "Your silver tongue works on every trader: you buy [1]% cheaper and sell [2]% dearer.",
+      "lyrical": "A good word is worth more than a full purse.",
+      "ru": {
+        "name": "Красноречие - пассивный навык",
+        "description": "Ваш язык действует на любого торговца: вы покупаете на [1]% дешевле и продаёте на [2]% дороже.",
+        "lyrical": "Доброе слово стоит дороже полного кошелька."
+      },
+      "ranks": [
+        {
+          "level": 6,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 6,
+            "Param2": 10
+          }
+        },
+        {
+          "level": 14,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 12,
+            "Param2": 20
+          }
+        },
+        {
+          "level": 22,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 18,
+            "Param2": 30
+          }
+        },
+        {
+          "level": 30,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 24,
+            "Param2": 40
+          }
+        },
+        {
+          "level": 38,
+          "mana": 0,
+          "cooldown": 0,
+          "params": {
+            "Param1": 30,
+            "Param2": 50
+          }
+        }
+      ],
+      "trainer": []
+    }
+  ],
+  "_balance_about": "03.11: Ice Bolt Param3 = max(old, 0.6 x Fireball damage at the same required level); Frost Nova Param2 = max(old, 0.9 x Fireball)",
+  "_radius_about": "03.11: Frost Nova radius Param3 6/9/12 m (jumps at ranks 6 and 11, as Fireball); one effect per radius"
+}

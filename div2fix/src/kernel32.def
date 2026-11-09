@@ -17,6 +17,7 @@ CloseHandle@4
 DisableThreadLibraryCalls@4
 QueryPerformanceCounter@4
 QueryPerformanceFrequency@4
+GetTickCount@0
 VirtualAlloc@16
 VirtualFree@12
 GetLocalTime@4
@@ -51,3 +52,4 @@ AddVectoredExceptionHandler@8
 FindFirstFileA@8
 FindNextFileA@8
 FindClose@4
+GetLastError@0

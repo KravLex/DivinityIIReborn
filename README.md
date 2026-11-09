@@ -5,8 +5,8 @@
 A visual, engine and quality-of-life overhaul for **Divinity II: Developer's Cut** (Steam, Windows):
 a spoiler-free **mind-reading advisor**, **4x AI-upscaled textures**, HD normal maps and icons, a fix for the
 game's **hard, flickering shadow edges**, **SMAA + TAA anti-aliasing** before the interface, 8K shadow maps,
-smoother bloom and sun rays, correct **ultrawide menus**, intro skip and more. The mod does not change gameplay,
-balance or saves (an optional, separately installed skill-balance module is the only exception, see below).
+smoother bloom and sun rays, correct **ultrawide menus**, intro skip and more. Since 2.0 it also adds
+**new skills, a rebalance, full gamepad support and a launcher**.
 
 **Download, full description and installation:** Nexus Mods — *(link)*
 
@@ -19,7 +19,7 @@ replacement shaders and of SMAA/TAA (`shaders/`, built by `tools/shaders/`).
 **Requirements:** Divinity II: Developer's Cut (Steam), a Vulkan 1.3 GPU,
 and **[Div2Patch](https://github.com/BlanknameES/Div2Patch)** by BlanknameES (install it first).
 
-**Installation:** install Div2Patch → extract `DivinityIIReborn_v1.5.zip` into the game folder (the one with
+**Installation:** install Div2Patch → extract `DivinityIIReborn_v2.0.zip` into the game folder (the one with
 `bin` and `Data`) → optionally extract the HD texture pack there too → play.
 Settings: `bin\Div2Fix.ini`, `bin\dxvk.conf`. Uninstall: `_Div2Reborn\uninstall.cmd`.
 
@@ -29,6 +29,14 @@ renders at the higher resolution and is scaled down to the screen: grass, foliag
 and with the mod's anti-aliasing edges are almost perfectly smooth. The cost is FPS (2.25 times the pixels). The mod
 was tested at 5160x2160 via DLDSR. NVIDIA Control Panel → Manage 3D settings → DSR - Factors (tick the DL factors),
 then choose the new resolution in the game's options.
+
+### New in 2.0, in short
+
+**New:** 12 new mage skills and new skills for other paths; Contagious Curse, an explosion of all summons, Chain Lightning, Holy Smite, Drain and more; Eloquence (trader discounts) and Detective (more loot); Skill rebalance; The new skills and bonuses above +1 on random items, armour and weapons included; Full gamepad support: XInput and DualSense; A launcher with an installation check; Skill icons zoom in the tree, windows fade in, coloured item comparison; Mouse wheel in the journal, no limit of 100 saves.
+
+**Fixed:** Climbing in the air when the camera turned on a ladder; A bow was compared with the shield instead of the weapon; Gloves did not match the colour of their armour set; The camera randomly refused to turn.
+
+Sources in this repository since 2.0: `MageExpansion/` (skills: config, tools, docs; no sound or image assets) and `launcher/`.
 
 ### New in 1.5
 
@@ -217,3 +225,5 @@ byte for byte.
 ## License
 
 MIT (see `LICENSE`). Divinity II and all its assets are © Larian Studios; this is a non-commercial fan project.
+
+Chain Lightning sound: "Electric Spark Zap" by BudgetPixel AI (https://budgetpixel.com/sfx/electric-spark-zap-06a5e8b2), CC BY 4.0.

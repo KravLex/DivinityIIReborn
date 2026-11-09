@@ -39,6 +39,9 @@ static FixedCreate_t  g_create;
 static FixedRelease_t g_release;
 static int            g_last;          /* Order=last */
 static int            g_rounds;        /* registrations by the exe (start, data reload) */
+static BYTE*          g_async;         /* [14CED60]: archive opening goes to the loading threads (0x68F03E) */
+static int            g_sync;          /* [Overlay] Sync=1: ours are opened at once (a test, 07.11) */
+static int            g_dot = 1;       /* [Overlay] DotPath=1: registered as Packed\.\Reborn\ (07.11) */
 
 static int same(Module m, DWORD va, const char* hex)
 {
@@ -77,6 +80,20 @@ static void copy(char* d, const char* s, int cap)
     d[i] = 0;
 }
 
+static char g_first[256];               /* [Overlay] First=a.dv2,b.dv2: registered as Packed\.\Reborn\ */
+
+static int in_first(const char* f)
+{
+    for (const char* p = g_first; *p; ) {
+        int k = 0;
+        while (p[k] && p[k] != ',' && f[k] && lc(p[k]) == lc(f[k])) k++;
+        if ((!p[k] || p[k] == ',') && !f[k]) return 1;
+        while (*p && *p != ',') p++;
+        while (*p == ',' || *p == ' ') p++;
+    }
+    return 0;
+}
+
 /* registers every <dir of slot>\Reborn\*.dv2 with the patch flags */
 static void register_overlay(void* mgr, void* edx, const char* slot)
 {
@@ -86,6 +103,12 @@ static void register_overlay(void* mgr, void* edx, const char* slot)
     for (int i = 0; slot[i]; i++) if (slot[i] == '\\' || slot[i] == '/') cut = i;
     if (cut < 0 || cut + 8 >= MAX_PATH - 16) { logf("Overlay: unexpected slot name '%s', nothing added", slot); return; }
     copy(dir, slot, cut + 2);                                   /* "...\Packed\" */
+    /* 07.11: the game reads the archives in the alphabetical order of their full paths (DKS_Patch, FOV_Patch, GFX, GUI,
+       MainData*, Patch*, then Reborn\*: ReadFile trace), and of two copies of a file the earlier path won: our skill
+       prototypes lost to FOV_Patch_2/MainDataStartup. "Packed\.\Reborn\" is the same folder for Windows and sorts
+       before every letter. Only for the archives named in [Overlay] First= (default MageData.dv2, the skill XML alone):
+       given to all of them, files that used to lose came into play (the hero's KF/KFM with the appended sequences,
+       Textures.bin, fonts) and the camera no longer turned up and down. DotPath=0 turns it off. */
     copy(dir + cut + 1, "Reborn\\", MAX_PATH - cut - 1);
     copy(pattern, dir, MAX_PATH);
     copy(pattern + s_len(pattern), "*.dv2", MAX_PATH - s_len(pattern));
@@ -109,12 +132,26 @@ static void register_overlay(void* mgr, void* edx, const char* slot)
         int d = s_len(dir);
         if (d + s_len(names[i]) >= MAX_PATH) { logf("Overlay: path too long, skipped %s", names[i]); continue; }
         copy(path, dir, MAX_PATH);
+        if (g_dot && in_first(names[i])) {                         /* "...\Packed\" + ".\Reborn\" */
+            copy(path + cut + 1, ".\\Reborn\\", MAX_PATH - cut - 1);
+            d = s_len(path);
+        }
         copy(path + d, names[i], MAX_PATH - d);
         char* name = g_create(path);
         if (!name) { logf("Overlay: could not make a name for %s, skipped", path); continue; }
+        /* 07.11: 0x68F030 queues the archive's opening to the loading threads while [14CED60] is set, else runs it at
+           once (vtbl+20h). Queued, the archives came in by thread timing, and now and then the original prototypes
+           (FOV_Patch_2 / MainDataStartup) won over ours: no new skills, and a crash at 0x89F9B0 loading a save that has
+           them. Ours are opened at once, before anything queued. */
+        /* (07.11: opening ours at once did not help either - still the 78 original entries - so it is off again:
+           [Overlay] Sync=1 turns it on for tests) */
+        BYTE was = g_async ? *g_async : 0;
+        if (g_async && g_sync) *g_async = 0;
         g_orig(mgr, edx, &name, 0, 0, 1);
+        if (g_async && g_sync) *g_async = was;
         g_release(&name, 0);
-        logf("Overlay: registered %s (%s the patch slots, round %d)", path, g_last ? "after" : "before", g_rounds);
+        logf("Overlay: registered %s (%s the patch slots, round %d%s)", path, g_last ? "after" : "before", g_rounds,
+             !g_sync ? "" : g_async ? (was ? ", opened at once instead of queued" : ", opened at once") : ", queue flag unknown");
     }
 }
 
@@ -125,6 +162,10 @@ static void __fastcall hk_register(void* mgr, void* edx, char** name, int a, int
     int after = g_last && c == 1 && ends_with(n, "\\Patch_4.dv2");
     if (before || after) g_rounds++;
     if (before) register_overlay(mgr, edx, n);
+    /* 07.11: opening every archive at once crashed the start (0x846954, before the menu). The 12 patch slots (c = 1) are
+       opened at once, in order, so that ours (Order=last, after Patch_4) come in after them: of two copies of a file the
+       archive added last wins (the 'Skills' asset had the 78 entries of FOV_Patch_2 while ours came first) */
+    /* (tried 07.11 with Order=last: still the 78 original entries, and the cursor was gone: reverted) */
     g_orig(mgr, edx, name, a, b, c);
     if (after) register_overlay(mgr, edx, n);
 }
@@ -135,6 +176,9 @@ void overlay_init(Module m)
     char order[16];
     GetPrivateProfileStringA("Overlay", "Order", "first", order, sizeof order, g_ini);
     g_last = lc(order[0]) == 'l';
+    g_sync = GetPrivateProfileIntA("Overlay", "Sync", 0, g_ini);
+    g_dot = GetPrivateProfileIntA("Overlay", "DotPath", 1, g_ini);
+    GetPrivateProfileStringA("Overlay", "First", "MageData.dv2", g_first, sizeof g_first, g_ini);
 
     /* the exe can be relocated: opcodes and embedded addresses are compared separately */
     DWORD d = (DWORD)m.base - 0x400000;
@@ -150,6 +194,12 @@ void overlay_init(Module m)
         logf("Overlay: code mismatch (register %d, name %d, release %d) -> no overlay archives", okReg, okCreate, okRelease);
         return;
     }
+    /* 697D74: call 68F030; 68F03E: cmp byte [14CED60],0 / jne (queue) (checked in the exe 07.11) */
+    BYTE* cq = VA(m, 0x697D74);
+    if (cq[0] == 0xE8 && (DWORD)(cq + 5 + *(int*)(cq + 1)) == 0x68F030 + d && same(m, 0x68F03E, "803d") &&
+        *(DWORD*)VA(m, 0x68F040) == 0x14CED60 + d && same(m, 0x68F044, "0075"))
+        g_async = VA(m, 0x14CED60);
+    else logf("Overlay: archive queue code differs -> overlay archives are queued as before");
     g_create = (FixedCreate_t)VA(m, 0x4B34D0);
     g_release = (FixedRelease_t)VA(m, 0x401170);
     g_orig = (Register_t)detour(reg, (void*)hk_register);

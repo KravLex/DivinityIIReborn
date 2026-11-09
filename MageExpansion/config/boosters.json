@@ -1,0 +1,434 @@
+{
+  "_about": "07.11.2026: our skills as 'Skill Boosters' of random items (Episodes\\*\\rpgstats_itemmagicaleffects.xml, docs/LOOT_SKILL_BOOSTERS.md). id = the item property number kept in saves: never renumber. class: W warrior, M mage, D necromancer, R ranger. ru = the prefix in 6 forms: masculine, masculine plural, feminine, feminine plural, neuter, neuter plural. Our prototypes get extra_ranks spare ranks above their maximum (copies of the last rank) so a +1 on a maxed skill finds a rank.",
+  "extra_ranks": 0,
+  "template": "Magic Missile",
+  "boosters": [
+    {
+      "skill": "Ice Bolt",
+      "id": 286,
+      "min": 1,
+      "value": 700,
+      "class": "M",
+      "prefix": "Icy",
+      "ru": [
+        "Ледяной",
+        "Ледяные",
+        "Ледяная",
+        "Ледяные",
+        "Ледяное",
+        "Ледяные"
+      ]
+    },
+    {
+      "skill": "Frost Nova",
+      "id": 287,
+      "min": 3,
+      "value": 1100,
+      "class": "M",
+      "prefix": "Wintry",
+      "ru": [
+        "Зимний",
+        "Зимние",
+        "Зимняя",
+        "Зимние",
+        "Зимнее",
+        "Зимние"
+      ]
+    },
+    {
+      "skill": "Chain Lightning",
+      "id": 288,
+      "min": 3,
+      "value": 1100,
+      "class": "M",
+      "prefix": "Crackling",
+      "ru": [
+        "Трескучий",
+        "Трескучие",
+        "Трескучая",
+        "Трескучие",
+        "Трескучее",
+        "Трескучие"
+      ]
+    },
+    {
+      "skill": "Arcane Push",
+      "id": 289,
+      "min": 3,
+      "value": 1100,
+      "class": "M",
+      "prefix": "Repelling",
+      "ru": [
+        "Отталкивающий",
+        "Отталкивающие",
+        "Отталкивающая",
+        "Отталкивающие",
+        "Отталкивающее",
+        "Отталкивающие"
+      ]
+    },
+    {
+      "skill": "Arcane Shield",
+      "id": 290,
+      "min": 3,
+      "value": 1100,
+      "class": "M",
+      "prefix": "Warded",
+      "ru": [
+        "Оберегающий",
+        "Оберегающие",
+        "Оберегающая",
+        "Оберегающие",
+        "Оберегающее",
+        "Оберегающие"
+      ]
+    },
+    {
+      "skill": "Spell Critical",
+      "id": 291,
+      "min": 6,
+      "value": 1700,
+      "class": "M",
+      "prefix": "Piercing",
+      "ru": [
+        "Пронзающий",
+        "Пронзающие",
+        "Пронзающая",
+        "Пронзающие",
+        "Пронзающее",
+        "Пронзающие"
+      ]
+    },
+    {
+      "skill": "Hunter's Mark",
+      "id": 292,
+      "min": 3,
+      "value": 1100,
+      "class": "R",
+      "prefix": "Marking",
+      "ru": [
+        "Метящий",
+        "Метящие",
+        "Метящая",
+        "Метящие",
+        "Метящее",
+        "Метящие"
+      ]
+    },
+    {
+      "skill": "Second Wind",
+      "id": 293,
+      "min": 6,
+      "value": 1700,
+      "class": "W",
+      "prefix": "Tireless",
+      "ru": [
+        "Неутомимый",
+        "Неутомимые",
+        "Неутомимая",
+        "Неутомимые",
+        "Неутомимое",
+        "Неутомимые"
+      ]
+    },
+    {
+      "skill": "Pack Hunger",
+      "id": 294,
+      "min": 6,
+      "value": 1700,
+      "class": "D",
+      "prefix": "Ravenous",
+      "ru": [
+        "Ненасытный",
+        "Ненасытные",
+        "Ненасытная",
+        "Ненасытные",
+        "Ненасытное",
+        "Ненасытные"
+      ]
+    },
+    {
+      "skill": "Holy Smite",
+      "id": 295,
+      "min": 3,
+      "value": 1100,
+      "class": "M",
+      "prefix": "Holy",
+      "ru": [
+        "Святой",
+        "Святые",
+        "Святая",
+        "Святые",
+        "Святое",
+        "Святые"
+      ]
+    },
+    {
+      "skill": "Blessing",
+      "id": 296,
+      "min": 3,
+      "value": 1100,
+      "class": "W",
+      "prefix": "Blessed",
+      "ru": [
+        "Благословенный",
+        "Благословенные",
+        "Благословенная",
+        "Благословенные",
+        "Благословенное",
+        "Благословенные"
+      ]
+    },
+    {
+      "skill": "Bow Expertise",
+      "id": 297,
+      "min": 1,
+      "value": 700,
+      "class": "R",
+      "prefix": "Archer's",
+      "ru": [
+        "Лучницкий",
+        "Лучницкие",
+        "Лучницкая",
+        "Лучницкие",
+        "Лучницкое",
+        "Лучницкие"
+      ]
+    },
+    {
+      "skill": "Drain",
+      "id": 298,
+      "min": 3,
+      "value": 1100,
+      "class": "D",
+      "prefix": "Draining",
+      "ru": [
+        "Иссушающий",
+        "Иссушающие",
+        "Иссушающая",
+        "Иссушающие",
+        "Иссушающее",
+        "Иссушающие"
+      ]
+    },
+    {
+      "skill": "Ice Arrow",
+      "id": 299,
+      "min": 3,
+      "value": 1100,
+      "class": "R",
+      "prefix": "Frosted",
+      "ru": [
+        "Заиндевелый",
+        "Заиндевелые",
+        "Заиндевелая",
+        "Заиндевелые",
+        "Заиндевелое",
+        "Заиндевелые"
+      ]
+    },
+    {
+      "skill": "Aimed Shot",
+      "id": 300,
+      "min": 3,
+      "value": 1100,
+      "class": "R",
+      "prefix": "Sharpshooter's",
+      "ru": [
+        "Снайперский",
+        "Снайперские",
+        "Снайперская",
+        "Снайперские",
+        "Снайперское",
+        "Снайперские"
+      ]
+    },
+    {
+      "skill": "Arrow Volley",
+      "id": 301,
+      "min": 6,
+      "value": 1700,
+      "class": "R",
+      "prefix": "Volleying",
+      "ru": [
+        "Залповый",
+        "Залповые",
+        "Залповая",
+        "Залповые",
+        "Залповое",
+        "Залповые"
+      ]
+    },
+    {
+      "skill": "Armor Breaker",
+      "id": 302,
+      "min": 6,
+      "value": 1700,
+      "class": "W",
+      "prefix": "Sundering",
+      "ru": [
+        "Раскалывающий",
+        "Раскалывающие",
+        "Раскалывающая",
+        "Раскалывающие",
+        "Раскалывающее",
+        "Раскалывающие"
+      ]
+    },
+    {
+      "skill": "Battle Cry",
+      "id": 303,
+      "min": 6,
+      "value": 1700,
+      "class": "W",
+      "prefix": "Roaring",
+      "ru": [
+        "Ревущий",
+        "Ревущие",
+        "Ревущая",
+        "Ревущие",
+        "Ревущее",
+        "Ревущие"
+      ]
+    },
+    {
+      "skill": "Ram Charge",
+      "id": 304,
+      "min": 6,
+      "value": 1700,
+      "class": "W",
+      "prefix": "Ramming",
+      "ru": [
+        "Таранный",
+        "Таранные",
+        "Таранная",
+        "Таранные",
+        "Таранное",
+        "Таранные"
+      ]
+    },
+    {
+      "skill": "Contagious Curse",
+      "id": 305,
+      "min": 10,
+      "value": 2500,
+      "class": "D",
+      "prefix": "Plagued",
+      "ru": [
+        "Чумной",
+        "Чумные",
+        "Чумная",
+        "Чумные",
+        "Чумное",
+        "Чумные"
+      ]
+    },
+    {
+      "skill": "Blood Bond",
+      "id": 306,
+      "min": 10,
+      "value": 2500,
+      "class": "D",
+      "prefix": "Bound",
+      "ru": [
+        "Связующий",
+        "Связующие",
+        "Связующая",
+        "Связующие",
+        "Связующее",
+        "Связующие"
+      ]
+    },
+    {
+      "skill": "Summon Explosion",
+      "id": 307,
+      "min": 10,
+      "value": 2500,
+      "class": "D",
+      "prefix": "Bursting",
+      "ru": [
+        "Разрывной",
+        "Разрывные",
+        "Разрывная",
+        "Разрывные",
+        "Разрывное",
+        "Разрывные"
+      ]
+    },
+    {
+      "skill": "Call of Vengeance",
+      "id": 308,
+      "min": 10,
+      "value": 2500,
+      "class": "D",
+      "prefix": "Vengeful",
+      "ru": [
+        "Мстительный",
+        "Мстительные",
+        "Мстительная",
+        "Мстительные",
+        "Мстительное",
+        "Мстительные"
+      ]
+    },
+    {
+      "skill": "Detective",
+      "id": 309,
+      "min": 6,
+      "value": 1700,
+      "class": "WMDR",
+      "prefix": "Sleuth's",
+      "ru": [
+        "Сыщицкий",
+        "Сыщицкие",
+        "Сыщицкая",
+        "Сыщицкие",
+        "Сыщицкое",
+        "Сыщицкие"
+      ]
+    },
+    {
+      "skill": "Eloquence",
+      "id": 310,
+      "min": 6,
+      "value": 1700,
+      "class": "WMDR",
+      "prefix": "Silver-tongued",
+      "ru": [
+        "Красноречивый",
+        "Красноречивые",
+        "Красноречивая",
+        "Красноречивые",
+        "Красноречивое",
+        "Красноречивые"
+      ]
+    }
+  ],
+  "_tiers": "07.11: higher tiers for every Skill Booster (the game's 47 and ours): ids from tier_first_id in the order of the group, skill by skill, tier by tier - never reorder the group or the tiers (saves keep ids)",
+  "tier_first_id": 400,
+  "tiers": [
+    {
+      "min_lvl": 20,
+      "min": 2,
+      "max": 3,
+      "freq": 1,
+      "gold_mul": 1.8
+    },
+    {
+      "min_lvl": 35,
+      "min": 3,
+      "max": 5,
+      "freq": 1,
+      "gold_mul": 3.0
+    }
+  ],
+  "_allow": "08.11: AllowUse letters added to every skill booster by its class: A armour/shields, B belts/rings, X swords/axes, Y bows, Z hammers",
+  "allow_extra": {
+    "M": "AZB",
+    "D": "AZB",
+    "W": "AXB",
+    "R": "AYB"
+  },
+  "_freq": "08.11: weights for ~20 % of the armour/weapon boost slots (armour 19-36 %, hammers 12-24 %, swords/axes/bows 6-14 % by level): base +1 = base_freq, the tiers 1 and 1",
+  "base_freq": 2
+}

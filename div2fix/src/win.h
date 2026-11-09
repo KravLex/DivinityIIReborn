@@ -49,6 +49,7 @@ __declspec(dllimport) int WINAPI wvsprintfA(LPSTR, LPCSTR, __builtin_va_list);
 typedef struct { long long QuadPart; } LARGE_INTEGER_;
 __declspec(dllimport) BOOL WINAPI QueryPerformanceCounter(long long*);
 __declspec(dllimport) BOOL WINAPI QueryPerformanceFrequency(long long*);
+__declspec(dllimport) DWORD WINAPI GetTickCount(void);
 __declspec(dllimport) void WINAPI Sleep(DWORD);
 __declspec(dllimport) HANDLE WINAPI CreateThread(void*, SIZE_T, DWORD (WINAPI*)(void*), void*, DWORD, DWORD*);
 __declspec(dllimport) short WINAPI GetAsyncKeyState(int);
@@ -57,6 +58,7 @@ __declspec(dllimport) int WINAPI MessageBoxW(void*, const unsigned short*, const
 __declspec(dllimport) DWORD WINAPI GetWindowThreadProcessId(void*, DWORD*);
 __declspec(dllimport) int WINAPI PostMessageA(void*, UINT, DWORD, long);
 __declspec(dllimport) DWORD WINAPI GetCurrentProcessId(void);
+__declspec(dllimport) DWORD WINAPI GetLastError(void);
 __declspec(dllimport) void* WINAPI VirtualAlloc(void*, SIZE_T, DWORD, DWORD);
 __declspec(dllimport) BOOL WINAPI VirtualFree(void*, SIZE_T, DWORD);
 #define MEM_RESERVE 0x2000

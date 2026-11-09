@@ -1,33 +1,63 @@
-SHA-256 of DivinityIIReborn_v1.5.zip and the files in it
+04d8ccb39d3b1450c2044f8cab010e28d2262434c7d3bf7e146385bd07384dd7  DivinityIIReborn_v2.0.zip
 
-c4bd05d749502c1c39fe0e8682f0aa0b39e198af9f13e4e1a670f5b87a7f3f86  DivinityIIReborn_v1.5.zip
-
-ff32f94f5484c7e2966eedce48705e9abc1eb732bff4a38510097fd3f71d7966  _Div2Reborn/Optional/SkillBalance/FOV_Patch_2.dv2                          OPTIONAL skill-balance module (game data archive, changes gameplay; not installed by extracting)
-e3b6f2521c7f28575cfea7f3b8bc84ff498e3179559c86bffb1784741ea8a2a4  _Div2Reborn/uninstall.cmd                                                  uninstaller (plain batch file, deletes only the mod's own files)
-ef8089d0a2d18c348e557d5557373abf3984db0e305bcc2e3eed308b7a4d0557  bin/d3d9.dll                                                               DXVK 3.1.1 + dxvk/patches (0001-0006, 0009-0015), built with dxvk/build_dxvk.sh (MSYS2 MINGW32, GCC 16.2)
-de8a51ca7d3e4f3d8e16fcd13e0815ff80fe6696b4502ae17e4a6cb41d0f2868  bin/dinput8.dll                                                            Div2Fix 1.5, built from div2fix/ in this repository
-345f6abf216e7795d8bb4d1c5b42c0b20dbdde87f790665fbb967940c1d29166  bin/Div2Fix.ini                                                            settings (text)
-ec01d6d55a5278c159b808274fd40cbe9a96505159105960e199a61dd801fb28  bin/Div2Fix_mindread.txt                                                   mind-read advisor table (text)
-c70455cb5cf9bf144fc0c8e9475071c47814a8c12e58857b4c7dd9bcfa9df465  bin/dxvk.conf                                                              DXVK settings (text)
-1e7e90055d08d596b33d83c55958e3074ef50f4e071f941a3dfcfa59a1bcd04d  bin/Div2Reborn_override/far/d50c5e8e8201ae4165e7edeca1b991f8cf1c16bf.dxso  lighting shaders, built from shaders/far by tools/shaders/build_overrides.py
-a6705812f2bfe4e5ec24139922bccc1b5bb29e6626aa267e8239de7f3565c1af  bin/Div2Reborn_override/far/e6bef6f7376173eb73df5390447a1067939c5e8a.dxso  lighting shaders, built from shaders/far by tools/shaders/build_overrides.py
-3b6c18f1d963e03745b6f4cbddace35d2eb33c0fdb125b852ec3c493cd4ddd15  bin/Div2Reborn_post/AreaTex.bin                                            SMAA/TAA passes, built from shaders/ by tools/shaders/build_post.py
-8488e2e35e9dd4f1eef642057366f247fa2c9d3eefae84cdd76810d94a5e5a3a  bin/Div2Reborn_post/SearchTex.bin                                          SMAA/TAA passes, built from shaders/ by tools/shaders/build_post.py
-f3fa807234d7053cf7f4997be4860e800d13c9974853c00b6a4ffa9eb9f9f586  bin/Div2Reborn_post/smaa_blend.ps.dxso                                     SMAA/TAA passes, built from shaders/ by tools/shaders/build_post.py
-193a9e94f450cdc9ed1944facb897568892a38f53a0b9a409de4f1f3f9f0b1dd  bin/Div2Reborn_post/smaa_blend.vs.dxso                                     SMAA/TAA passes, built from shaders/ by tools/shaders/build_post.py
-96b6e720cf0420be38718bc577b9923b764b49471e6744a35858df7af77eb71b  bin/Div2Reborn_post/smaa_edge.ps.dxso                                      SMAA/TAA passes, built from shaders/ by tools/shaders/build_post.py
-c445039645a43bb86ff0b179b09a425d5305e01005bb9a4e299a473ad3284c25  bin/Div2Reborn_post/smaa_edge.vs.dxso                                      SMAA/TAA passes, built from shaders/ by tools/shaders/build_post.py
-27d0a46b94ba75d5054801719c05537254ab35ec3c06727d096ecb9b58a8571b  bin/Div2Reborn_post/smaa_edge_geo.ps.dxso                                  SMAA/TAA passes, built from shaders/ by tools/shaders/build_post.py
-461f293edd12ed73cc42c04272fcd10ebc978ecefb85ec40aafa2bf8db0edce7  bin/Div2Reborn_post/smaa_weight.ps.dxso                                    SMAA/TAA passes, built from shaders/ by tools/shaders/build_post.py
-068b061b604bebde2d52413def0b51cae9bac6af6d527f7a328a802b2c1830bd  bin/Div2Reborn_post/smaa_weight.vs.dxso                                    SMAA/TAA passes, built from shaders/ by tools/shaders/build_post.py
-ec420d51736007ee6834d1c6ecb7be51db9ac503ae48d620bbff7136abf98fc8  bin/Div2Reborn_post/taa.ps.dxso                                            SMAA/TAA passes, built from shaders/ by tools/shaders/build_post.py
-23f0b00cf63a1083d0214459dac6e509a7d6e476be8dfc2f1a11221fba53034b  bin/Div2Reborn_post/taa.vs.dxso                                            SMAA/TAA passes, built from shaders/ by tools/shaders/build_post.py
-e6fe96fbaee6bfa731f5c50c2b7962d089f9d7aabdcb4a0d644806b50f16ae93  Data/Win32/Packed/Reborn/Reborn_FX.dv2                                     effects pack (game data archive, upscaled effect textures)
-
-All files with hashes: see the release notes / DivinityIIReborn_v1.5_SHA256.txt.
-
-Reproducing dinput8.dll: building div2fix/ with LLVM (build.sh or build.cmd) gives a file that is
-byte-identical to the released one except the 4-byte PE TimeDateStamp at file offset 0x80 (same LLVM version).
-*.dxso and the SMAA lookup textures: tools/shaders/ rebuilds them byte for byte (with the system d3dcompiler_47).
-d3d9.dll: a GCC/MinGW build is not bit-reproducible across toolchains; compare behaviour, or use the official
-DXVK 3.1.1 x32/d3d9.dll instead (see README).
+2f411e701fdc8d6c947bccb53c15767f071e0058b153d5082268f00e914c9a89  Autorun.exe
+8310b7c7df25e5b036e50c85584bb27ec22ffb2e1ab5813f6faa9a81a49eaff9  Data/Win32/Packed/Reborn/GamepadGlyphs.dv2
+562d86eb0b8c613a076954c47a5e52fe7b1c459968ef80632bdbb1e2d26fe10d  Data/Win32/Packed/Reborn/MageData.dv2
+f57fd75ff343f6337d07a2b2a9f8a96ad6b44e85c0d2d816b9f58de76a13d004  Data/Win32/Packed/Reborn/MageExpansion.dv2
+e6fe96fbaee6bfa731f5c50c2b7962d089f9d7aabdcb4a0d644806b50f16ae93  Data/Win32/Packed/Reborn/Reborn_FX.dv2
+d6c822e6b9e02e95b93ac6568cb2ef617bd6ef07e052194c3d4b2236fe4b8fe9  _Div2Reborn/README.txt
+85b24ba0ec5d6af077fd1822e9b6398ce6cc142daec96b95aed2c6b4fe678a96  _Div2Reborn/uninstall.cmd
+b59f6b679b63c543090354747785229a87e2093a3a60670125f184cc9199d0d1  _Div2Reborn/ReShade/Div2Reborn_0_Off.ini
+d58df3e74bacf7bbd543aa4855e6a5c9db15b9a1bd4e6d7411f7036c3edf75c2  _Div2Reborn/ReShade/Div2Reborn_1_Recommended.ini
+6ca1610cf1e65a4c04ddcbf59a489ad1d2617151b76bc5c3ef35d22cca973672  _Div2Reborn/ReShade/Div2Reborn_2_Clean.ini
+befa74b86e6111c34ace75430f6dcf9f51f8fb5fa91f2d19de43a6f95ef515b4  _Div2Reborn/ReShade/Div2Reborn_3_Vivid.ini
+c44c0909d1cf8b3aaf4a7a885841c6fdd71f7438970a49e7f47d714b596fc282  _Div2Reborn/ReShade/ReShade_install_EN.txt
+5cb012acafddc72f2eabb5a20aa9aa9757f40858177758f643aee43abd57c0d3  _Div2Reborn/ReShade/ReShade_install_RU.txt
+bc5b9927370c7d3014aec227ea415b4fcf1e0670d53b6548a9dbc334c9a5a5ff  _Div2Reborn/licenses/DXVK_CHANGES.txt
+a5cb1a6ded7d2d7e92d550ba28edd21be2d1d4044662b399887351023e30ce64  _Div2Reborn/licenses/DXVK_LICENSE.txt
+3dbea12561b4e0d15a7c0dc016deb47dca3aaf0f4fac97c1abd0b53faac365a9  _Div2Reborn/licenses/Div2Fix_LICENSE.txt
+73d916d67aa5afcdb2da6d203f782b0cff442d4d022b11915e8c2c17231ed154  _Div2Reborn/licenses/SMAA_LICENSE.txt
+0d05cab352e4ea5f82f878a41ed472621fd97c179fe35962d100c66f3a8799e1  _Div2Reborn/licenses/Sounds_credits.md
+240e27224b0186acaafedfc472cf139462d5c945aa8493e1ab40160f679b347e  _Div2Reborn/licenses/dxvk_patches/0001-d3d9-skipManagedTextureInit.patch
+b8dc2096d27d2c480ad480672971fce8c002ab8f9a2134dceedf38eec19c752a  _Div2Reborn/licenses/dxvk_patches/0002-d3d9-uploadManagedOnUnlock.patch
+b50e89a9f3718ee669e1d4c185d2c58a5d05be84bb9c53cf5bd67c783040f0df  _Div2Reborn/licenses/dxvk_patches/0003-d3d9-asyncManagedUpload.patch
+cbecab31250948887cfc62e8ab4ea748d497436223d7ddc9eba5620e6586bdee  _Div2Reborn/licenses/dxvk_patches/0004-d3d9-stagingMemoryPerSubmission.patch
+9252d12cbe41f1efa32bf3d6fbbe3b4bcfc8f431bf7dee0a6546e4be53cfb758  _Div2Reborn/licenses/dxvk_patches/0005-d3d9-parallelManagedUpload.patch
+59127f7e1fe129ffbc19cc7db894b9f33fda93666d82af242492866eed2f7192  _Div2Reborn/licenses/dxvk_patches/0006-d3d9-deferUnmappableRelease.patch
+cfbe31ea89946aef24dbc19fcb2ba9b9f31136ab512f30d73ecf313bd6299a97  _Div2Reborn/licenses/dxvk_patches/0009-d3d9-frameCensus.patch
+1d538f88a1ee3b1b36f2f210b6c1996be6b376d7b4a38ef359660ce4da1b28f6  _Div2Reborn/licenses/dxvk_patches/0010-d3d9-shaderOverride.patch
+d50dddcf5a6cebd33e3b8b8113fc55b9e5462db41cbcd6e21c7972670d08117a  _Div2Reborn/licenses/dxvk_patches/0011-d3d9-postAA.patch
+b60bb58d36fedf3ba20cfa497ad3dcf119f05b8d79d381c7cc25a9f553eac1ff  _Div2Reborn/licenses/dxvk_patches/0012-d3d9-postTAA.patch
+d871bc4a33dd860516a7848921086969a5e73c58ee6627f80215ac552e3a01f3  _Div2Reborn/licenses/dxvk_patches/0013-d3d9-gpuTimers.patch
+a48c41d5d40e6b8121ba1d47787cc71b8a09840852d92595236255b18a41f43b  _Div2Reborn/licenses/dxvk_patches/0014-d3d9-windowProcChain.patch
+933b140a38817af0d086d80e08c15d17dbfb0bf78b3e5447aa4b03c2763602bd  _Div2Reborn/licenses/dxvk_patches/0015-d3d9-postAADebugViews.patch
+3caa0e16941dc4c27f755067e323f6e3d117de654c18808fbb6f391171f50269  bin/Div2Fix.ini
+ec01d6d55a5278c159b808274fd40cbe9a96505159105960e199a61dd801fb28  bin/Div2Fix_mindread.txt
+ef8089d0a2d18c348e557d5557373abf3984db0e305bcc2e3eed308b7a4d0557  bin/d3d9.dll
+10c271e9a08750b4c0fe6f89be5b5735d008333b65c4b1bf31338aad43d125c9  bin/dinput8.dll
+c70455cb5cf9bf144fc0c8e9475071c47814a8c12e58857b4c7dd9bcfa9df465  bin/dxvk.conf
+1e7e90055d08d596b33d83c55958e3074ef50f4e071f941a3dfcfa59a1bcd04d  bin/Div2Reborn_override/far/d50c5e8e8201ae4165e7edeca1b991f8cf1c16bf.dxso
+a6705812f2bfe4e5ec24139922bccc1b5bb29e6626aa267e8239de7f3565c1af  bin/Div2Reborn_override/far/e6bef6f7376173eb73df5390447a1067939c5e8a.dxso
+3b6c18f1d963e03745b6f4cbddace35d2eb33c0fdb125b852ec3c493cd4ddd15  bin/Div2Reborn_post/AreaTex.bin
+8488e2e35e9dd4f1eef642057366f247fa2c9d3eefae84cdd76810d94a5e5a3a  bin/Div2Reborn_post/SearchTex.bin
+f3fa807234d7053cf7f4997be4860e800d13c9974853c00b6a4ffa9eb9f9f586  bin/Div2Reborn_post/smaa_blend.ps.dxso
+193a9e94f450cdc9ed1944facb897568892a38f53a0b9a409de4f1f3f9f0b1dd  bin/Div2Reborn_post/smaa_blend.vs.dxso
+96b6e720cf0420be38718bc577b9923b764b49471e6744a35858df7af77eb71b  bin/Div2Reborn_post/smaa_edge.ps.dxso
+c445039645a43bb86ff0b179b09a425d5305e01005bb9a4e299a473ad3284c25  bin/Div2Reborn_post/smaa_edge.vs.dxso
+27d0a46b94ba75d5054801719c05537254ab35ec3c06727d096ecb9b58a8571b  bin/Div2Reborn_post/smaa_edge_geo.ps.dxso
+461f293edd12ed73cc42c04272fcd10ebc978ecefb85ec40aafa2bf8db0edce7  bin/Div2Reborn_post/smaa_weight.ps.dxso
+068b061b604bebde2d52413def0b51cae9bac6af6d527f7a328a802b2c1830bd  bin/Div2Reborn_post/smaa_weight.vs.dxso
+ec420d51736007ee6834d1c6ecb7be51db9ac503ae48d620bbff7136abf98fc8  bin/Div2Reborn_post/taa.ps.dxso
+23f0b00cf63a1083d0214459dac6e509a7d6e476be8dfc2f1a11221fba53034b  bin/Div2Reborn_post/taa.vs.dxso
+02bb7e4bed163f002df62acf6cbadfde1bb0f776624d41b85363599e9dd7649d  bin/MageExpansion/ArcanePush.wav
+5b19465f5085da0532619be03105b24cc825a9ec79e78a800cc361dc2d6dcdca  bin/MageExpansion/ArcaneShield.wav
+24642f6d3f12a4558d3a8e43ae71ff672698127d2354decd72c676082c6efdc5  bin/MageExpansion/BattleCry_F.wav
+7069b1d4d7c3f61c39fe6a380a33674bb431ebd2c79a14446175260b7d892dcb  bin/MageExpansion/BattleCry_F_game.wav
+118880987b450bcc3211891899b19da5ff9259632b027f6522d4c3875d15922f  bin/MageExpansion/BattleCry_M.wav
+3f5278348843890ef3b5a75530eac8017154d77f54653c92eca14e4e6ac7c240  bin/MageExpansion/BattleCry_M_game.wav
+8e76d137926fc1239cc3e6bb77d3e5f473456bdc4388c65c5c01a37c12c1f7e3  bin/MageExpansion/Blessing.wav
+814f20114d09546bb14ee7ec6739c657a363898b599a95dbddda45464e389703  bin/MageExpansion/ChainLightning.wav
+122cfd2fb1706607395d31702c371be06bd712fad85ce637ee645c213606c6b8  bin/MageExpansion/Drain.wav
+f025cc971311932760ea4cc9c4035a27cd7a270eba7902848dd9c2a7fa71013e  bin/MageExpansion/FrostNova.wav
+6e8f2ad1a819023b09e92c879070004222029ea5c0a8dbe9c47626e3b35520f4  bin/MageExpansion/HolySmite.wav
+215aa6ba7641d36107d4fd1c3c383326cd51f1a537334e5dc3948938fbca4763  bin/MageExpansion/IceBolt.wav

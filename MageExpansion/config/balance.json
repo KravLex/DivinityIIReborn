@@ -1,0 +1,876 @@
+{
+  "_about": "03.11.2026: changes to the game's own skills (tools/build_mage.py balance()). Source: Mandragorko's Steam guide 2914998758 and the game's data. Ranks 1-15 only (rows 16-30 are NPC variants). Ops run in order; params are numbered in the order of the Parameters attributes ([1] = Param1). Descriptions: 'desc_en' replaces the English text on every rank (and gets a Russian line), 'desc_ru' replaces only the translation.",
+  "skills": {
+    "Reflect": {
+      "_why": "guide: reflection matters only at 500-600%",
+      "ops": [
+        [
+          "mul",
+          1,
+          2.5
+        ]
+      ]
+    },
+    "Fatality": {
+      "_why": "guide: a 10-52% execute is useless, normal hits kill first",
+      "ops": [
+        [
+          "linear",
+          1,
+          20,
+          70
+        ]
+      ]
+    },
+    "Regenerate": {
+      "_why": "guide: negligible",
+      "ops": [
+        [
+          "mul",
+          1,
+          2.0
+        ]
+      ]
+    },
+    "Jump Attack": {
+      "_why": "guide: slow, single target, no advantage; 05.11 the user: a passive, must not cost mana (the game's data: 4..21 per jump attack)",
+      "ops": [
+        [
+          "mul",
+          1,
+          1.6
+        ],
+        [
+          "cost_set",
+          0
+        ]
+      ]
+    },
+    "Poison Arrows": {
+      "_why": "guide: outclassed by Splitting and Explosive Arrows; 05.11 the user: low ranks as they are, higher ranks stronger",
+      "ops": [
+        [
+          "mul",
+          1,
+          1.6
+        ],
+        [
+          "set",
+          1,
+          {
+            "9": 222,
+            "10": 354,
+            "11": 516,
+            "12": 624,
+            "13": 756,
+            "14": 900,
+            "15": 1260
+          }
+        ],
+        [
+          "set",
+          2,
+          {
+            "9": 7,
+            "10": 7,
+            "11": 7,
+            "12": 7,
+            "13": 6,
+            "14": 6,
+            "15": 5
+          }
+        ]
+      ]
+    },
+    "Two Handed Weapon Expertise": {
+      "_why": "guide: the weakest weapon style",
+      "ops": [
+        [
+          "linear",
+          1,
+          5,
+          75
+        ]
+      ]
+    },
+    "Unarmed Expertise": {
+      "_why": "guide: the worst style; ranks 11-15 added only +4% each",
+      "ops": [
+        [
+          "set",
+          1,
+          {
+            "11": 147,
+            "12": 160,
+            "13": 173,
+            "14": 186,
+            "15": 200
+          }
+        ]
+      ]
+    },
+    "Way of the Battle Mage": {
+      "_why": "guide: the weakest buff of its branch",
+      "ops": [
+        [
+          "mul",
+          2,
+          1.3
+        ]
+      ],
+      "desc_en": "You get a bonus of [2]% for magic damage, but a [3] point penalty for magic resistance, and a [4] point penalty for indomitable will. The effect lasts for a maximum of [1] seconds.",
+      "desc_ru": "Ваша магия наносит на [2]% больше урона, а вот защита от магии ухудшается ([3]). Кроме того, вы хуже себя контролируете: воля [4]. Эффект заклинания сохраняется не более [1] сек."
+    },
+    "Firewall": {
+      "_why": "guide: small radius and duration, 30 s cooldown",
+      "ops": [
+        [
+          "mul",
+          1,
+          1.6
+        ],
+        [
+          "add",
+          2,
+          2
+        ],
+        [
+          "cooldown_mul",
+          0.65
+        ]
+      ]
+    },
+    "Magic Blast": {
+      "_why": "guide: one of the worst attack skills; data: rank 15 did less than rank 14",
+      "ops": [
+        [
+          "set",
+          2,
+          {
+            "15": 210
+          }
+        ],
+        [
+          "mul",
+          2,
+          1.8
+        ]
+      ]
+    },
+    "Polymorph": {
+      "_why": "guide: hits break it, wasteful mana",
+      "ops": [
+        [
+          "add",
+          2,
+          2
+        ],
+        [
+          "cost_mul",
+          0.6
+        ]
+      ]
+    },
+    "Life Tap": {
+      "_why": "ranks 6-15 needed hero level 90 and did not grow; it is an active skill (the Russian name said passive)",
+      "ops": [
+        [
+          "linear",
+          1,
+          3,
+          9
+        ],
+        [
+          "level_linear",
+          15,
+          40
+        ]
+      ],
+      "name_ru": "Обмен - активный навык"
+    },
+    "Defensive Posture": {
+      "_why": "guide: negligible; data: rank 15 dropped the damage bonus from 18 to 0",
+      "ops": [
+        [
+          "set",
+          2,
+          {
+            "15": 20
+          }
+        ],
+        [
+          "set",
+          3,
+          {
+            "15": 20
+          }
+        ],
+        [
+          "mul",
+          4,
+          1.34
+        ],
+        [
+          "mul",
+          5,
+          1.34
+        ]
+      ],
+      "desc_en": "You get a bonus of [4] for melee resistance, and [5] for ranged resistance, but a [2]% penalty for melee damage, and a [3]% penalty for ranged damage. The effect lasts for a maximum of [1] seconds.",
+      "desc_ru": "Вы улучшаете свою защиту от ударов на [4], а от стрел - на [5]. При этом становятся слабее ваши собственные удары ([2]%) и выстрелы ([3]%). Длительность: до [1] сек."
+    },
+    "Dragon Burst": {
+      "_why": "guide: junk",
+      "ops": [
+        [
+          "mul",
+          2,
+          1.5
+        ]
+      ]
+    },
+    "Dragon Shield": {
+      "_why": "guide: tiny absorb, long cooldown",
+      "ops": [
+        [
+          "mul",
+          3,
+          3.0
+        ]
+      ]
+    },
+    "Bleed": {
+      "_why": "guide: the description does not give the total; [2] is per second of the bleed",
+      "desc_en": "A successful melee hit has a [1]% chance of bleeding your enemy. For [3] seconds the wound deals [2]% of the hit's damage every second.",
+      "desc_ru": "Удачно нанесённый удар с вероятностью [1]% оставляет кровоточащую рану: [3] сек. она каждую секунду наносит [2]% урона этого удара."
+    },
+    "Thousand Strikes": {
+      "_why": "guide: the Russian text promises a higher critical chance that does not exist",
+      "desc_ru": "Вы сможете провести серию быстрых ударов, нанося в [2] раза больший урон и сбивая противника с ног с вероятностью [1]%."
+    },
+    "Way of the Ranger": {
+      "_why": "guide: it raises the armour rating against shots, not a percentage",
+      "desc_en": "For up to [1] seconds, your bow attacks do [4] more damage, your armour rating against shots rises by [5] and your heightened reflexes by [6] points, but you get a [2]% penalty for melee attacks and a [3]% penalty for melee resistance.",
+      "desc_ru": "В течение [1] сек. ваш лук наносит на [4] больше урона, рейтинг брони против стрел растёт на [5], а реакция - на [6] очк. При этом снижается сила ваших ударов в ближнем бою ([2]%) и защита от ударов в ближнем бою ([3]%)."
+    },
+    "Summon Mastery": {
+      "_why": "guide: weak, and the \"up to [2] creatures\" was false (Param2 read nowhere); Div2Fix SummonLimit=1 keeps Param2 creatures (03.11: the crash with two was the game's BucketID recursion, fixed by BucketGuard); one per summon skill (SummonRecast=0); power x1.5; hero levels 6..40; 07.11 the user: power up to 600% at rank 15 (the game's rank 15 is 225: x600/225); 07.11 the description names the Skull creature and the +2%/level (Div2Fix SkullMastery, SummonLevelPct); 07.11 the Skull creature +70% damage, /1.5 damage taken (Div2Fix SkullDamagePct=70, SkullArmorPct=50), approved; 07.11 SkullDamagePct/SkullArmorPct back to 0: the creature spells are raised in the data instead",
+      "desc_en": "You can keep up to [2] summoned creatures of different kinds at once, and they have a [1]% increase in power. The creature of the Crystal Skull gets this bonus too. Your summoned creatures also deal 2% more damage and take 2% less for every level you have.",
+      "ops": [
+        [
+          "mul",
+          1,
+          2.666667
+        ],
+        [
+          "level_linear",
+          6,
+          40
+        ],
+        [
+          "set",
+          2,
+          {
+            "1": 1,
+            "2": 1,
+            "3": 1,
+            "4": 1,
+            "5": 2,
+            "6": 2,
+            "7": 2,
+            "8": 2,
+            "9": 2,
+            "10": 3,
+            "11": 3,
+            "12": 3,
+            "13": 3,
+            "14": 3,
+            "15": 3
+          }
+        ]
+      ],
+      "desc_ru": "Вы можете держать при себе до [2] призванных существ разных видов одновременно, и их мощь возрастает на [1]%. Это касается и существа Хрустального черепа. Кроме того, ваши призванные существа наносят на 2% больше урона и получают на 2% меньше за каждый ваш уровень."
+    },
+    "Dual Wielding Expertise": {
+      "_why": "guide: the text reads as if the off-hand never gets a bonus",
+      "desc_en": "When fighting with two weapons, your primary weapon does [1]% more damage; the off-hand weapon's damage changes by [2]% (a penalty at low ranks, a bonus from rank 9).",
+      "desc_ru": "Взяв по одноручному оружию в каждую руку, вы наносите на [1]% больше урона правой рукой. Урон левой руки меняется на [2]%: на низких рангах это штраф, с 9-го ранга - бонус."
+    },
+    "Fear": {
+      "_why": "ranks needed hero levels 3, 10, 17 ... 101 (7 per rank): rank 6+ was out of reach; the Russian text swapped [1] (level) and [2] (seconds)",
+      "ops": [
+        [
+          "level_linear",
+          3,
+          40
+        ]
+      ],
+      "desc_ru": "От вас исходят волны ужаса. Все враги уровня [1] и ниже в радиусе [3] м в страхе бегут от вас в течение [2] сек."
+    },
+    "Charm": {
+      "_why": "ranks needed hero levels 6, 12 ... 90 (6 per rank): rank 8+ was out of reach",
+      "ops": [
+        [
+          "level_linear",
+          6,
+          40
+        ]
+      ]
+    },
+    "Blind": {
+      "_why": "ranks needed hero levels 10, 13 ... 52: the last ranks were out of reach",
+      "ops": [
+        [
+          "level_linear",
+          10,
+          40
+        ]
+      ]
+    },
+    "Destruction": {
+      "_why": "ranks needed hero levels 10, 15 ... 80: rank 9+ was out of reach; trainers sold only up to 8",
+      "ops": [
+        [
+          "level_linear",
+          10,
+          40
+        ]
+      ],
+      "desc_en": "Your magical attacks do [1]% more damage.",
+      "desc_ru": "Ваши боевые заклинания наносят на [1]% больше урона."
+    },
+    "Summon Ghost": {
+      "_why": "summons too weak: healing x1.5 (03.11: duration x1.5 and level +4 undone while the transparent ground / summon delay is investigated); 07.11 the user: creature level up to 46 at rank 15 (game 40; +0..+6 spread over the ranks)",
+      "ops": [
+        [
+          "mul",
+          5,
+          1.5
+        ],
+        [
+          "set",
+          1,
+          {
+            "1": 1,
+            "2": 4,
+            "3": 10,
+            "4": 12,
+            "5": 16,
+            "6": 19,
+            "7": 22,
+            "8": 25,
+            "9": 27,
+            "10": 31,
+            "11": 34,
+            "12": 37,
+            "13": 40,
+            "14": 43,
+            "15": 46
+          }
+        ]
+      ]
+    },
+    "Fireball": {
+      "_why": "too strong after the rest of the balance: damage x0.8 (Ice Bolt and Frost Nova keep their values, taken from the original)",
+      "ops": [
+        [
+          "mul",
+          3,
+          0.8
+        ]
+      ]
+    },
+    "Wisdom": {
+      "_why": "03.11 user: +2% experience per rank (30% at 15) was not worth a skill point; now 4% at rank 1 .. 50% at 15",
+      "ops": [
+        [
+          "linear",
+          1,
+          4,
+          50
+        ]
+      ]
+    },
+    "Fatigue Consumption": {
+      "_why": "05.11 the user: rank 10 needed level 48, rank 15 level 72; the only trainer step was 10",
+      "ops": [
+        [
+          "level_linear",
+          3,
+          40
+        ],
+        [
+          "linear",
+          1,
+          90,
+          25
+        ]
+      ]
+    },
+    "Confusion": {
+      "_why": "05.11 the user: rank 9 needed level 47, rank 15 level 77; the only trainer step was 9",
+      "ops": [
+        [
+          "level_linear",
+          7,
+          40
+        ],
+        [
+          "linear",
+          1,
+          8,
+          20
+        ],
+        [
+          "linear",
+          2,
+          2,
+          5
+        ]
+      ]
+    },
+    "Way of the Wise Wizard": {
+      "ops": [],
+      "desc_en": "You get a bonus of [3] for magic resistance, and [4] for indomitable will, but a [2]% penalty for magic damage. The effect lasts for a maximum of [1] seconds.",
+      "desc_ru": "Ваша магия наносит меньше урона ([2]%), зато защита от магии улучшается на [3]. Кроме того, вы лучше себя контролируете: воля увеличивается на [4]. Эффект заклинания сохраняется не более [1] сек."
+    },
+    "Battle Rage": {
+      "ops": [],
+      "desc_en": "You get a bonus of [2]% for melee damage, but a penalty of [3] for melee resistance. The effect lasts for a maximum of [1] seconds.",
+      "desc_ru": "Ваши удары наносят на [2]% больше урона, однако защита от ударов ослабевает ([3]). Продолжительность действия: до [1] сек."
+    },
+    "Explosive Arrows": {
+      "_why": "05.11 the user: its damage does not scale; x1 at rank 1 growing to x1.6 at rank 15",
+      "ops": [
+        [
+          "set",
+          1,
+          {
+            "1": 130,
+            "2": 193,
+            "3": 247,
+            "4": 312,
+            "5": 355,
+            "6": 437,
+            "7": 530,
+            "8": 608,
+            "9": 716,
+            "10": 839,
+            "11": 920,
+            "12": 1061,
+            "13": 1214,
+            "14": 1323,
+            "15": 1507
+          }
+        ]
+      ]
+    },
+    "Summon Undead": {
+      "_why": "07.11 the user: creature level up to 46 at rank 15 (game 40; +0..+6 spread over the ranks)",
+      "ops": [
+        [
+          "set",
+          1,
+          {
+            "1": 1,
+            "2": 4,
+            "3": 9,
+            "4": 12,
+            "5": 16,
+            "6": 19,
+            "7": 22,
+            "8": 25,
+            "9": 27,
+            "10": 31,
+            "11": 34,
+            "12": 37,
+            "13": 40,
+            "14": 43,
+            "15": 46
+          }
+        ]
+      ]
+    },
+    "Summon Demon": {
+      "_why": "07.11 the user: creature level up to 46 at rank 15 (game 40; +0..+6 spread over the ranks)",
+      "ops": [
+        [
+          "set",
+          1,
+          {
+            "1": 20,
+            "2": 23,
+            "3": 25,
+            "4": 26,
+            "5": 29,
+            "6": 30,
+            "7": 32,
+            "8": 34,
+            "9": 35,
+            "10": 37,
+            "11": 39,
+            "12": 41,
+            "13": 42,
+            "14": 45,
+            "15": 46
+          }
+        ]
+      ]
+    },
+    "creature_magicblast": {
+      "_why": "07.11 the user: the creature gets these spells up to rank 10 only, so rank 10 has the strong values (rank 15 of before) and ranks 11-15 repeat it; 07.11 the user: damage -30%",
+      "ops": [
+        [
+          "set",
+          1,
+          {
+            "1": 3,
+            "2": 3,
+            "3": 4,
+            "4": 4,
+            "5": 5,
+            "6": 5,
+            "7": 6,
+            "8": 6,
+            "9": 7,
+            "10": 7,
+            "11": 7,
+            "12": 7,
+            "13": 7,
+            "14": 7,
+            "15": 7
+          }
+        ],
+        [
+          "set",
+          2,
+          {
+            "1": 20,
+            "2": 26,
+            "3": 33,
+            "4": 43,
+            "5": 56,
+            "6": 72,
+            "7": 93,
+            "8": 120,
+            "9": 155,
+            "10": 200,
+            "11": 200,
+            "12": 200,
+            "13": 200,
+            "14": 200,
+            "15": 200
+          }
+        ],
+        [
+          "mul",
+          2,
+          0.7
+        ]
+      ]
+    },
+    "creature_magicmissile": {
+      "_why": "07.11 the user: the creature gets these spells up to rank 10 only, so rank 10 has the strong values (rank 15 of before) and ranks 11-15 repeat it; 07.11 the user: damage -30%",
+      "ops": [
+        [
+          "set",
+          1,
+          {
+            "1": 1,
+            "2": 2,
+            "3": 2,
+            "4": 3,
+            "5": 4,
+            "6": 4,
+            "7": 5,
+            "8": 6,
+            "9": 6,
+            "10": 7,
+            "11": 7,
+            "12": 7,
+            "13": 7,
+            "14": 7,
+            "15": 7
+          }
+        ],
+        [
+          "set",
+          2,
+          {
+            "1": 9,
+            "2": 13,
+            "3": 19,
+            "4": 27,
+            "5": 40,
+            "6": 58,
+            "7": 84,
+            "8": 121,
+            "9": 176,
+            "10": 255,
+            "11": 255,
+            "12": 255,
+            "13": 255,
+            "14": 255,
+            "15": 255
+          }
+        ],
+        [
+          "mul",
+          2,
+          0.7
+        ]
+      ]
+    },
+    "creature_fireball": {
+      "_why": "07.11 the user: the creature gets its spells up to rank 10 only: the game's curve of ranks 1-15 squeezed into 1-10 (rank 10 = 1115 damage, 20% fire), ranks 11-15 repeat rank 10; 07.11 the user: damage -30%",
+      "ops": [
+        [
+          "set",
+          3,
+          {
+            "1": 5,
+            "2": 22,
+            "3": 49,
+            "4": 150,
+            "5": 220,
+            "6": 313,
+            "7": 565,
+            "8": 716,
+            "9": 902,
+            "10": 1115,
+            "11": 1115,
+            "12": 1115,
+            "13": 1115,
+            "14": 1115,
+            "15": 1115
+          }
+        ],
+        [
+          "set",
+          10,
+          {
+            "1": 1,
+            "2": 3,
+            "3": 5,
+            "4": 7,
+            "5": 9,
+            "6": 12,
+            "7": 14,
+            "8": 16,
+            "9": 18,
+            "10": 20,
+            "11": 20,
+            "12": 20,
+            "13": 20,
+            "14": 20,
+            "15": 20
+          }
+        ],
+        [
+          "mul",
+          3,
+          0.7
+        ]
+      ]
+    },
+    "Curse": {
+      "_why": "07.11 the user: a 1 s cooldown is too cheap, 15 s at rank 1 .. 10 s at 15",
+      "ops": [
+        [
+          "cooldown_linear",
+          15,
+          10
+        ]
+      ]
+    }
+  },
+  "trainer_extra": {
+    "_about": "03.11: higher caps of game skills, each purchase right after the after_cap one (the trainer offers them in list order); Div2Fix TrainerExtra<n> adds them to loaded saves",
+    "groups": [
+      {
+        "after_cap": 13,
+        "cap": 15,
+        "gold": 10000,
+        "required_level": 32,
+        "skills": [
+          "Unarmed Expertise",
+          "Single Handed Weapon Expertise",
+          "Dual Wielding Expertise",
+          "Sword and Shield Expertise",
+          "Two Handed Weapon Expertise"
+        ]
+      }
+    ]
+  },
+  "trainer_ladders": {
+    "_about": "03.11: these skills stopped at 5-8 (or were sold by no trainer): every mage trainer sells 10/13/15 at the game's usual prices; Div2Fix TrainerExtra<n> adds them to loaded saves",
+    "trainers": [
+      "Trainer_Mage_1",
+      "Trainer_Mage_2",
+      "Exp_Trainer_Mage_1",
+      "Exp_Trainer_Mage_2"
+    ],
+    "skills": {
+      "Destruction": [
+        [
+          10,
+          1500,
+          17
+        ],
+        [
+          13,
+          5000,
+          27
+        ],
+        [
+          15,
+          10000,
+          32
+        ]
+      ],
+      "Summon Mastery": [
+        [
+          10,
+          1500,
+          17
+        ],
+        [
+          13,
+          5000,
+          27
+        ],
+        [
+          15,
+          10000,
+          32
+        ]
+      ],
+      "Fear": [
+        [
+          10,
+          1500,
+          17
+        ],
+        [
+          13,
+          5000,
+          27
+        ],
+        [
+          15,
+          10000,
+          32
+        ]
+      ],
+      "Charm": [
+        [
+          10,
+          1500,
+          17
+        ],
+        [
+          13,
+          5000,
+          27
+        ],
+        [
+          15,
+          10000,
+          32
+        ]
+      ],
+      "Blind": [
+        [
+          10,
+          1500,
+          17
+        ],
+        [
+          13,
+          5000,
+          27
+        ],
+        [
+          15,
+          10000,
+          32
+        ]
+      ],
+      "Life Tap": [
+        [
+          10,
+          1500,
+          17
+        ],
+        [
+          13,
+          5000,
+          27
+        ],
+        [
+          15,
+          10000,
+          32
+        ]
+      ],
+      "Fatigue Consumption": [
+        [
+          13,
+          5000,
+          27
+        ],
+        [
+          15,
+          10000,
+          32
+        ]
+      ],
+      "Confusion": [
+        [
+          10,
+          1500,
+          17
+        ],
+        [
+          13,
+          5000,
+          27
+        ],
+        [
+          15,
+          10000,
+          32
+        ]
+      ]
+    }
+  },
+  "trainer_remove": {
+    "_about": "03.11: the expansion sold these odd caps (7/8) before the usual 10/13/15: removed (Div2Fix TrainerRemove does it in loaded saves)",
+    "rows": [
+      [
+        "Fear",
+        7
+      ],
+      [
+        "Charm",
+        7
+      ],
+      [
+        "Blind",
+        8
+      ],
+      [
+        "Destruction",
+        8
+      ],
+      [
+        "Confusion",
+        9
+      ]
+    ]
+  },
+  "_limbs_about": "07.11 the user: the necromancer creature (Crystal Skull) parts. \"limbs\" = {item subtype: factor} on every stat mod of those items (rpgstats_itemprototypes.xml, both episodes). Severed Arms x2: Undead melee and Dragonelf magic damage +60..150% -> +120..300%, Goblin +20..110% -> +40..220% (health, melee, magic), Necromancer health +40..140% -> +80..280%.",
+  "limbs": {
+    "Severed Arms": 2.0
+  }
+}

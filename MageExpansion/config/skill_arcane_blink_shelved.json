@@ -1,0 +1,214 @@
+{
+  "id": "ArcaneBlink",
+  "stage": "own skill: the free skill id 0x36, Div2Fix Name54 and OwnBlink54 (rays, no CodePath code); Param3 = metres",
+  "uuid": "Arcane Blink",
+  "name": "Arcane Blink",
+  "code_path": "Newt",
+  "tree": [
+    6,
+    4
+  ],
+  "default_level": 0,
+  "icon": {
+    "from": "MagicMissile",
+    "art": "arcane_blink",
+    "saturation": 0.75,
+    "green": 1.1
+  },
+  "description": "You vanish and reappear up to [3] meters ahead in the direction you are facing. Walls stop you short; if there is nowhere to land, the spell does not take effect and costs nothing.",
+  "lyrical": "Distance is only a habit of the world, and a mage can make it forget for a moment.",
+  "ru": {
+    "name": "Магический рывок - активный навык",
+    "description": "Вы исчезаете и появляетесь на расстоянии до [3] м впереди, в направлении взгляда. Стена остановит рывок раньше; если встать негде, заклинание не сработает и ничего не потратит.",
+    "lyrical": "Расстояние — всего лишь привычка мира, и маг может на миг заставить его об этом забыть."
+  },
+  "ranks": [
+    {
+      "level": 6,
+      "mana": 11,
+      "cooldown": 12,
+      "params": {
+        "Param1": 0,
+        "Param2": 0,
+        "Param3": 6
+      }
+    },
+    {
+      "level": 9,
+      "mana": 13,
+      "cooldown": 12,
+      "params": {
+        "Param1": 0,
+        "Param2": 0,
+        "Param3": 6
+      }
+    },
+    {
+      "level": 12,
+      "mana": 16,
+      "cooldown": 12,
+      "params": {
+        "Param1": 0,
+        "Param2": 0,
+        "Param3": 6
+      }
+    },
+    {
+      "level": 15,
+      "mana": 19,
+      "cooldown": 11,
+      "params": {
+        "Param1": 0,
+        "Param2": 0,
+        "Param3": 7
+      }
+    },
+    {
+      "level": 18,
+      "mana": 22,
+      "cooldown": 11,
+      "params": {
+        "Param1": 0,
+        "Param2": 0,
+        "Param3": 7
+      }
+    },
+    {
+      "level": 21,
+      "mana": 25,
+      "cooldown": 11,
+      "params": {
+        "Param1": 0,
+        "Param2": 0,
+        "Param3": 8
+      }
+    },
+    {
+      "level": 24,
+      "mana": 31,
+      "cooldown": 10,
+      "params": {
+        "Param1": 0,
+        "Param2": 0,
+        "Param3": 8
+      }
+    },
+    {
+      "level": 26,
+      "mana": 33,
+      "cooldown": 10,
+      "params": {
+        "Param1": 0,
+        "Param2": 0,
+        "Param3": 9
+      }
+    },
+    {
+      "level": 28,
+      "mana": 36,
+      "cooldown": 10,
+      "params": {
+        "Param1": 0,
+        "Param2": 0,
+        "Param3": 9
+      }
+    },
+    {
+      "level": 30,
+      "mana": 38,
+      "cooldown": 9,
+      "params": {
+        "Param1": 0,
+        "Param2": 0,
+        "Param3": 9
+      }
+    },
+    {
+      "level": 32,
+      "mana": 43,
+      "cooldown": 9,
+      "params": {
+        "Param1": 0,
+        "Param2": 0,
+        "Param3": 10
+      }
+    },
+    {
+      "level": 34,
+      "mana": 45,
+      "cooldown": 9,
+      "params": {
+        "Param1": 0,
+        "Param2": 0,
+        "Param3": 10
+      }
+    },
+    {
+      "level": 36,
+      "mana": 49,
+      "cooldown": 8,
+      "params": {
+        "Param1": 0,
+        "Param2": 0,
+        "Param3": 11
+      }
+    },
+    {
+      "level": 38,
+      "mana": 53,
+      "cooldown": 8,
+      "params": {
+        "Param1": 0,
+        "Param2": 0,
+        "Param3": 11
+      }
+    },
+    {
+      "level": 40,
+      "mana": 57,
+      "cooldown": 8,
+      "params": {
+        "Param1": 0,
+        "Param2": 0,
+        "Param3": 12
+      }
+    }
+  ],
+  "trainer": [
+    {
+      "max_level": 10,
+      "gold": 1500,
+      "required_level": 17,
+      "description": "You will be able to study Arcane Blink in more detail.",
+      "available": true
+    },
+    {
+      "max_level": 13,
+      "gold": 5000,
+      "required_level": 27,
+      "description": "You will be able to take Arcane Blink to new extremes.",
+      "available": true
+    },
+    {
+      "max_level": 15,
+      "gold": 10000,
+      "required_level": 32,
+      "description": "You will be able to become a master of Arcane Blink.",
+      "available": true
+    }
+  ],
+  "own_effects": [
+    {
+      "_about": "where the hero leaves, Div2Fix OwnBlink54",
+      "name": "ArcaneBlink_Out",
+      "builder": "blink_out",
+      "rows_from": "FireBall_Cast"
+    },
+    {
+      "_about": "where the hero lands, Div2Fix OwnBlink54",
+      "name": "ArcaneBlink_In",
+      "builder": "blink_in",
+      "rows_from": "FireBall_Cast"
+    }
+  ]
+}

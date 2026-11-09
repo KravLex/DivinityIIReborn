@@ -10,3 +10,11 @@ GetForegroundWindow@0
 GetWindowThreadProcessId@8
 PostMessageA@16
 MessageBoxW@16
+GetCursorPos@4
+SetCursorPos@8
+GetWindowRect@8
+SendInput@12
+MapVirtualKeyA@8
+SetWindowsHookExA@16
+CallNextHookEx@16
+GetMessageA@16

@@ -1,3 +1,7 @@
+// 09.11.2026: the engine's variance floor; a set may define a smaller one before including this file (far: the blurred, pale shadows of NPCs)
+#ifndef VSM_VAR_FLOOR
+#define VSM_VAR_FLOOR 0.001
+#endif
 // Divinity II Reborn: the sun + ambient part of the engine's light pre-pass rewritten in HLSL from the disassembly,
 // same math and registers:
 //   TERRAIN 0: div2_PreLightPass_Sun_Packed_ViewSpace_VSM_Char          (ps_3_0 e6bef6f7376173eb73df5390447a1067939c5e8a)
@@ -45,6 +49,9 @@ float  SunIntensity        : register(c40);
 #ifndef SHADOW_FAR
 #define SHADOW_FAR 0     // 1: the engine's shadows, cascades blended, reaching further (set "far")
 #endif
+#ifndef SHADOW_FAR_COMPARE
+#define SHADOW_FAR_COMPARE 0   // 1 (set "far_compare", for screenshots): F11 "original lighting" shows the engine's
+#endif                         // hard cascade switch and shadow distance instead
 
 #include "gbuffer_ao.hlsli"
 #if SHADOW_QUALITY
@@ -71,7 +78,7 @@ float EngineCascade(float4 P, float n, out float edge)
     float2 mom = tex2Dlod(ShadowSampler, float4(suv, 0, 0)).xy;
 
     float d = sdepth - mom.x;
-    float var = saturate(mom.y - mom.x * mom.x + 0.001);
+    float var = saturate(mom.y - mom.x * mom.x + VSM_VAR_FLOOR);
     float pmax = var / (d * d + var);
     pmax *= pmax;
     pmax *= pmax;
@@ -106,11 +113,18 @@ float EngineShadow(float4 P, float viewZ, float terrain)
     float next = dot(is.xyz, ShadowDistances.yzw) + is.w * 1e9;
     float band = 0.15 * (next - start);
     float w = saturate((viewZ - (next - band)) / max(band, 1e-4));
+#if SHADOW_FAR_COMPARE
+    bool original = DebugView(2.0);
+    w = original ? 0.0 : w;
+#endif
     if (n < 2.5 && w > 0)
         pmax = lerp(pmax, EngineCascade(P, n + 1.0, edgeNext), w);
     edge = (n > 2.5) ? edge : 0.0;
     float3 vp = float3(dot(P, ViewRows[0]), dot(P, ViewRows[1]), viewZ);
     float fade = max(edge, saturate((length(vp) - 2.0 * ShadowFarDistance) / max(ShadowFarDistance, 50.0)));
+#if SHADOW_FAR_COMPARE
+    fade = original ? saturate((length(vp) - ShadowFarDistance) * 0.02) : fade;
+#endif
 #if TERRAIN
     float sun = terrain * pmax * (1.0 - fade) + terrain * fade;
 #else
@@ -147,7 +161,7 @@ float EngineShadow(float4 P, float viewZ, float terrain)
         sun = terrain;
     } else {
         float d = sdepth - mom.x;
-        float var = saturate(mom.y - mom.x * mom.x + 0.001);
+        float var = saturate(mom.y - mom.x * mom.x + VSM_VAR_FLOOR);
         float pmax = var / (d * d + var);
         float3 vp = float3(dot(P, ViewRows[0]), dot(P, ViewRows[1]), viewZ);
         float fade = saturate((length(vp) - ShadowFarDistance) * 0.02);

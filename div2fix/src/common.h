@@ -31,12 +31,33 @@ void camera_init(Module m);
 void icons_init(Module m);
 void intro_init(Module m);
 void overlay_init(Module m);
+void skilltrace_init(Module m);   /* Mage Skills Expansion: skill registration trace ([Diagnostics] SkillTrace=1) */
+void mageskills_init(Module m);   /* Mage Skills Expansion: gives the hero the new skills ([MageSkills] Enable=1) */
 int version_check(Module m);
 void shadow_on_device(void* dev);
 int shadow_wanted(void);
 void uitext_init(Module m);
 void window_init(Module m, HMODULE self);
 void input_on_dinput(void* di);
+/* gamepad (gamepad.c): XInput -> DirectInput keyboard/mouse (window.c) and Windows cursor in menus */
+void gamepad_init(Module m);
+int gamepad_on(void);
+void gamepad_take_motion(long* dx, long* dy, long* dz);
+void gamepad_ui_hooked(void);
+void gamepad_ui_movie(const char* name);
+void gamepad_ui_call(const char* name, int kind);   /* 0 NotifyMouseState, 1 mouse event, 2 SetViewport */
+void gamepad_give_back(long dx, long dy, long dz);
+/* d-pad menu focus (uinav.c) */
+void uinav_install(void** rootVt, void* probeOrig18);
+void uinav_frame(void* root, const char* movieName);
+int uinav_active(void);
+void uinav_request(int dir);
+void uinav_take_move(long* dx, long* dy);
+void uinav_release(void);
+int uinav_accept(void);
+int uinav_journal(void);
+int gamepad_hud_binding(WORD action, int* layer, int* face, unsigned short* glyph);
+void uinav_scroll(int steps);
 void diag_on_dinput(void* idi8);
 void* detour(void* target, void* hook);
 /* texture statistics module (texmgr.c), driven by diag.c */

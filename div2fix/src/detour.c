@@ -33,9 +33,11 @@ static int insn_len(const BYTE* p, int* rel)
     case 0x89: case 0x8B: case 0x8D: case 0x31: case 0x33: case 0x01: case 0x03: case 0x29: case 0x2B:
     case 0x85: case 0x39: case 0x3B: case 0x09: case 0x0B: case 0x21: case 0x23: case 0x87:
         hasModrm = 1; break;
-    case 0x83: hasModrm = 1; imm = 1; break;
+    case 0x83: case 0x80: hasModrm = 1; imm = 1; break;
     case 0x81: case 0xC7: hasModrm = 1; imm = opsize ? 2 : 4; break;
     case 0xFF: hasModrm = 1; break;              /* inc/dec/call/jmp/push r/m (absolute) */
+    case 0xD8: case 0xD9: case 0xDA: case 0xDB: case 0xDC: case 0xDD: case 0xDE: case 0xDF:
+        hasModrm = 1; break;                     /* x87 (07.11: fld [ebx+1B4h] of the item price 0x8D8470) */
     case 0x0F: {
         BYTE op2 = p[n++];
         if (op2 == 0xB6 || op2 == 0xB7 || op2 == 0xBE || op2 == 0xBF) { hasModrm = 1; break; } /* movzx/movsx */
