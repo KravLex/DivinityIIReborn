@@ -31,6 +31,50 @@ and with the mod's anti-aliasing edges are almost perfectly smooth. The cost is 
 was tested at 5160x2160 via DLDSR. NVIDIA Control Panel → Manage 3D settings → DSR - Factors (tick the DL factors),
 then choose the new resolution in the game's options.
 
+### Everything the mod does, in short
+
+**New skills**
+
+* Magic: Ice Bolt, Frost Nova, Chain Lightning, Arcane Push, Arcane Shield, Spell Critical, Holy Smite, Blessing, Drain.
+* Summoning and curses: Contagious Curse, Summon Explosion, Call of Vengeance, Pack Hunger, Blood Bond.
+* Bow: Ice Arrow, Arrow Volley, Hunter's Mark, Aimed Shot, Bow Expertise.
+* Melee and survival: Battle Cry, Ram Charge, Armor Breaker, Second Wind.
+* For everyone: Eloquence (trader discounts) and Detective (more loot from enemies and chests).
+
+**Gameplay and balance**
+
+* Weak game skills are stronger; errors in their numbers and descriptions are fixed.
+* The new skills appear on random loot; armour and weapons can give skill bonuses, including above +1.
+* The new skills sit in the tree next to related ones.
+
+**Controls**
+
+* Full gamepad support: XInput and DualSense, camera, menus and button prompts.
+* The launcher checks the installation and installs Div2Patch and ReShade in one click.
+
+**Graphics**
+
+* SMAA + TAA anti-aliasing before the interface: text and menus stay sharp.
+* Shadows without the seam in front of the hero, reaching twice as far; soft edges instead of stair-steps, an 8192 shadow map, sharp hero and dragon shadows.
+* Effects pack: 220 textures 4x sharper. HD Texture Pack (separate): textures, normal maps, icons and interface.
+* Draw distance of objects x5 and trees x6, smooth bloom and sun rays.
+
+**Fixes**
+
+* Crashes fixed: on loading a save and while processing materials; a detailed crash log.
+* The camera no longer turns the hero into the air on a ladder.
+* A bow is compared with the weapon in hand, not the shield.
+* Gloves of armour sets match the rest of the set.
+* Less stutter while textures load.
+
+**Interface and comfort**
+
+* A spoiler-free mind-reading advisor tells whether a read is worth the experience.
+* Correct menu proportions on ultrawide monitors.
+* Coloured item comparison, skill icons zoom in the tree, windows fade in.
+* No limit of 100 saves, mouse wheel in the journal.
+* Key prompts and map labels with non-Latin layouts, layout switching in the game, intro skip, a farther camera, holding left and right no longer drags the hero.
+
 ### New in 2.0, in short
 
 **New:** 12 new mage skills and new skills for other paths; Contagious Curse, an explosion of all summons, Chain Lightning, Holy Smite, Drain and more; Eloquence (trader discounts) and Detective (more loot); Skill rebalance; The new skills and bonuses above +1 on random items, armour and weapons included; Full gamepad support: XInput and DualSense; A launcher with an installation check; Skill icons zoom in the tree, windows fade in, coloured item comparison; Mouse wheel in the journal, no limit of 100 saves.
