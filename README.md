@@ -8,7 +8,7 @@ game's **hard, flickering shadow edges**, **SMAA + TAA anti-aliasing** before th
 smoother bloom and sun rays, correct **ultrawide menus**, intro skip and more. Since 2.0 it also adds
 **new skills, a rebalance, full gamepad support and a launcher**.
 
-**Download, full description and installation:** Nexus Mods — *(link)*
+**Download, full description and installation:** [Nexus Mods](https://www.nexusmods.com/divinity2developerscut/mods/8)
 
 This repository contains the source code of **Div2Fix** (`bin/dinput8.dll`), the engine part of the mod,
 the patches of the modified DXVK build (`bin/d3d9.dll`) shipped since 1.4, and since 1.5 the sources of the
