@@ -17,10 +17,11 @@ replacement shaders and of SMAA/TAA (`shaders/`, built by `tools/shaders/`).
 ## For players
 
 **Requirements:** Divinity II: Developer's Cut (Steam), a Vulkan 1.3 GPU,
-and **[Div2Patch](https://github.com/BlanknameES/Div2Patch)** by BlanknameES (install it first).
+and **[Div2Patch](https://github.com/BlanknameES/Div2Patch)** by BlanknameES (the launcher installs it).
 
-**Installation:** install Div2Patch → extract `DivinityIIReborn_v2.0.zip` into the game folder (the one with
-`bin` and `Data`) → optionally extract the HD texture pack there too → play.
+**Installation:** extract `DivinityIIReborn_v2.0.zip` into the game folder (the one with `bin` and `Data`) →
+optionally extract the HD texture pack there too → start the game from Steam: the launcher checks the installation and
+installs Div2Patch and, if you want it, ReShade in one click.
 Settings: `bin\Div2Fix.ini`, `bin\dxvk.conf`. Uninstall: `_Div2Reborn\uninstall.cmd`.
 
 **Graphics tip — DSR:** for the cleanest picture enable **DSR / DLDSR** in the NVIDIA driver (**VSR** on AMD) and
